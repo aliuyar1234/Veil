@@ -1,0 +1,19 @@
+[package]
+name = "veil-parsers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Document parsing library for PII detection - supports text, CSV, JSON, and HTML"
+keywords = ["parser", "pii", "privacy", "text-extraction"]
+categories = ["parsing", "text-processing"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+csv.workspace = true
+encoding_rs.workspace = true
+scraper.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true
