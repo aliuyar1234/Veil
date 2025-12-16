@@ -1,6 +1,6 @@
 # Veil
 
-[![CI](https://github.com/your-org/veil/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/veil/actions/workflows/ci.yml)
+[![CI](https://github.com/aliuyar1234/Veil/actions/workflows/ci.yml/badge.svg)](https://github.com/aliuyar1234/Veil/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 
@@ -24,7 +24,7 @@ A high-performance, privacy-focused toolkit for detecting and redacting Personal
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/veil.git
+git clone https://github.com/aliuyar1234/Veil.git
 cd veil
 
 # Build the CLI
@@ -169,7 +169,7 @@ wasm-pack build crates/veil-wasm --target web
 - **Audit trail integrity** via HMAC verification
 - **Dependency auditing** via `cargo-audit`
 
-Report security vulnerabilities to: security@your-org.com
+Report security vulnerabilities via GitHub Issues.
 
 ## Contributing
 
@@ -179,16 +179,11 @@ Report security vulnerabilities to: security@your-org.com
 4. Push to branch (`git push origin feature/amazing`)
 5. Open a Pull Request
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+Please ensure tests pass before submitting PRs.
 
 ## License
 
-Licensed under either of:
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT License ([LICENSE-MIT](LICENSE-MIT))
-
-at your option.
+MIT OR Apache-2.0
 
 ## Acknowledgments
 
