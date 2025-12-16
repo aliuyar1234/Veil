@@ -1,0 +1,27 @@
+[package]
+name = "veil-office"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Office document parsing (DOCX, XLSX, PPTX) for the Veil privacy platform"
+keywords = ["office", "docx", "xlsx", "pptx", "parser"]
+categories = ["parser-implementations", "text-processing"]
+
+[dependencies]
+# Workspace dependencies
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+# Office parsing
+calamine = { workspace = true }
+zip = { workspace = true }
+quick-xml = { workspace = true }
+
+# Re-export veil-parsers types
+veil-parsers = { path = "../veil-parsers" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+pretty_assertions = { workspace = true }
+veil-detect = { path = "../veil-detect" }

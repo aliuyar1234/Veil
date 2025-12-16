@@ -1,0 +1,70 @@
+# Veil Context Rules - French
+# Règles de contexte pour la détection PII en français
+
+version: "1.0"
+language: fr
+description: "French context markers for person names, suppressions, and labels"
+
+rules:
+  # Civilités - augmentent la confiance pour les noms
+  - pattern: "(?i)\\b(m|mme|mlle|mr|dr|prof)\\b\\.?\\s*"
+    action: boost
+    weight: 0.35
+    category: PersonName
+    description: "French honorifics"
+
+  - pattern: "(?i)\\b(monsieur|madame|mademoiselle)\\s+"
+    action: boost
+    weight: 0.35
+    category: PersonName
+    description: "Full French honorifics"
+
+  - pattern: "(?i)\\b(cher|chère|bonjour)\\s+"
+    action: boost
+    weight: 0.25
+    category: PersonName
+    description: "French salutations"
+
+  - pattern: "(?i)\\b(cordialement|salutations|sincèrement|bien à vous)\\s*"
+    action: boost
+    weight: 0.25
+    category: PersonName
+    description: "French letter closings"
+
+  # Labels
+  - pattern: "(?i)\\b(nom|prénom|nom complet|nom de famille)\\s*:?\\s*"
+    action: boost
+    weight: 0.3
+    category: PersonName
+    description: "French name labels"
+
+  - pattern: "(?i)\\b(courriel|email|e-mail|adresse mail)\\s*:?\\s*"
+    action: boost
+    weight: 0.35
+    category: Email
+    description: "Email labels"
+
+  - pattern: "(?i)\\b(téléphone|tél|portable|mobile|fax)\\s*:?\\s*"
+    action: boost
+    weight: 0.35
+    category: Phone
+    description: "Phone labels"
+
+  - pattern: "(?i)\\b(adresse|rue|adresse postale)\\s*:?\\s*"
+    action: boost
+    weight: 0.3
+    category: Address
+    description: "Address labels"
+
+  # Suppression patterns
+  - pattern: "(?i)\\bversion\\s*\\d"
+    action: suppress
+    weight: 0.6
+    category: Ipv4
+    description: "Version numbers"
+
+  - pattern: "(?i)\\b(numéro de commande|n° commande|référence|réf)\\s*:?\\s*"
+    action: suppress
+    weight: 0.5
+    category: CreditCard
+    description: "Order/reference numbers"

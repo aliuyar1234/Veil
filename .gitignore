@@ -37,3 +37,18 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Internal documentation and AI-assisted development artifacts
+.specify/
+specs/
+.claude/
+*.claude.*
+*claude-notes*
+*claude_notes*
+CLAUDE_*
+vision/
+.vision/
+*-vision.md
+*_vision.md
+docs/
+nul

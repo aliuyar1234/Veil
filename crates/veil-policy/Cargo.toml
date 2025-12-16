@@ -1,0 +1,21 @@
+[package]
+name = "veil-policy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "YAML-based policy engine for PII detection and protection"
+keywords = ["pii", "privacy", "policy", "yaml"]
+categories = ["config"]
+
+[dependencies]
+veil-detect = { path = "../veil-detect" }
+veil-redact = { path = "../veil-redact" }
+veil-crypto = { path = "../veil-crypto" }
+serde.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true

@@ -1,0 +1,33 @@
+# German Last Names (Surnames)
+# Source: Common German surnames
+# Format: name<TAB>frequency (0.0-1.0)
+Müller	0.92
+Schmidt	0.90
+Schneider	0.88
+Fischer	0.87
+Weber	0.86
+Meyer	0.85
+Wagner	0.84
+Becker	0.83
+Schulz	0.82
+Hoffmann	0.81
+Schäfer	0.80
+Koch	0.79
+Bauer	0.78
+Richter	0.77
+Klein	0.76
+Wolf	0.75
+Schröder	0.88
+Neumann	0.74
+Schwarz	0.73
+Zimmermann	0.72
+Braun	0.71
+Krüger	0.70
+Hofmann	0.69
+Hartmann	0.68
+Lange	0.67
+Mustermann	0.75
+Huber	0.80
+Maier	0.82
+Gruber	0.78
+Berger	0.76

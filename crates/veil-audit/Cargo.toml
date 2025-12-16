@@ -1,0 +1,28 @@
+[package]
+name = "veil-audit"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Audit logging with hash chain for PII operations"
+keywords = ["pii", "privacy", "audit", "logging"]
+categories = ["development-tools"]
+
+[dependencies]
+veil-detect = { path = "../veil-detect" }
+veil-redact = { path = "../veil-redact" }
+veil-crypto = { path = "../veil-crypto", optional = true }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+tempfile.workspace = true
+veil-crypto = { path = "../veil-crypto" }
+
+[features]
+default = []
+encryption = ["dep:veil-crypto"]

@@ -2,6 +2,8 @@
 
 use thiserror::Error;
 
+use crate::pdf::PdfError;
+
 /// Errors that can occur during parsing.
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -25,6 +27,10 @@ pub enum ParseError {
     /// Invalid JSON syntax.
     #[error("Invalid JSON: {0}")]
     JsonError(#[from] serde_json::Error),
+
+    /// PDF parsing error.
+    #[error("PDF error: {0}")]
+    PdfError(#[from] PdfError),
 
     /// File exceeds size limit.
     #[error("File too large: {size} bytes exceeds {max} byte limit")]

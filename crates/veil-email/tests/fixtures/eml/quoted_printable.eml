@@ -1,0 +1,15 @@
+From: qp@example.com
+To: recipient@example.com
+Subject: Quoted-Printable Encoding
+Date: Mon, 22 Dec 2024 16:00:00 +0000
+Message-ID: <qp@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+This message uses quoted-printable encoding.
+
+Special characters: =C3=A9=C3=A0=C3=BC (=C3=A9=C3=A0=C3=BC)
+
+Contact: qp@example.com
+Phone: 555-777-6666

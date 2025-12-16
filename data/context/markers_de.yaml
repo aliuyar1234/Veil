@@ -1,0 +1,64 @@
+# Veil Context Rules - German
+# Kontextregeln für PII-Erkennung im Deutschen
+
+version: "1.0"
+language: de
+description: "German context markers for person names, suppressions, and labels"
+
+rules:
+  # Anredeformen - erhöhen Konfidenz für Namen
+  - pattern: "(?i)\\b(herr|frau|dr|prof|dipl)\\b\\.?\\s*"
+    action: boost
+    weight: 0.35
+    category: PersonName
+    description: "German honorifics"
+
+  - pattern: "(?i)\\b(sehr geehrte?r?|liebe?r?)\\s+"
+    action: boost
+    weight: 0.3
+    category: PersonName
+    description: "Formal German salutations"
+
+  - pattern: "(?i)\\b(mit freundlichen grüßen|hochachtungsvoll|viele grüße)\\s*"
+    action: boost
+    weight: 0.25
+    category: PersonName
+    description: "German letter closings"
+
+  # Labels - boost confidence
+  - pattern: "(?i)\\b(name|vollständiger name|vorname|nachname|familienname)\\s*:?\\s*"
+    action: boost
+    weight: 0.3
+    category: PersonName
+    description: "German name labels"
+
+  - pattern: "(?i)\\b(e-mail|email|mailadresse)\\s*:?\\s*"
+    action: boost
+    weight: 0.35
+    category: Email
+    description: "Email labels"
+
+  - pattern: "(?i)\\b(telefon|tel|handy|mobil|fax)\\s*:?\\s*"
+    action: boost
+    weight: 0.35
+    category: Phone
+    description: "Phone labels"
+
+  - pattern: "(?i)\\b(adresse|anschrift|straße|postanschrift)\\s*:?\\s*"
+    action: boost
+    weight: 0.3
+    category: Address
+    description: "Address labels"
+
+  # Suppression patterns
+  - pattern: "(?i)\\bversion\\s*\\d"
+    action: suppress
+    weight: 0.6
+    category: Ipv4
+    description: "Version numbers"
+
+  - pattern: "(?i)\\b(bestellnummer|bestell-nr|artikelnummer|art-nr)\\s*:?\\s*"
+    action: suppress
+    weight: 0.5
+    category: CreditCard
+    description: "Order/article numbers"

@@ -1,0 +1,16 @@
+From: "John Doe" <john.doe@example.com>
+To: "Jane Smith" <jane.smith@example.com>, "Bob Wilson" <bob@example.org>
+Cc: "Alice Brown" <alice@example.net>
+Subject: Email with Display Names
+Date: Tue, 16 Dec 2024 14:30:00 -0500
+Message-ID: <display456@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+
+Hello Jane and Bob,
+
+This email tests parsing of display names in headers.
+
+Best regards,
+John Doe
+Phone: (555) 987-6543

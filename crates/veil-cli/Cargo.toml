@@ -1,0 +1,40 @@
+[package]
+name = "veil-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLI tool for PII detection and redaction"
+keywords = ["pii", "privacy", "cli", "gdpr"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "veil"
+path = "src/main.rs"
+
+[dependencies]
+veil-parsers = { path = "../veil-parsers" }
+veil-detect = { path = "../veil-detect" }
+veil-redact = { path = "../veil-redact" }
+veil-policy = { path = "../veil-policy" }
+veil-audit = { path = "../veil-audit" }
+veil-office = { path = "../veil-office" }
+veil-email = { path = "../veil-email" }
+veil-batch = { path = "../veil-batch" }
+veil-discovery = { path = "../veil-discovery" }
+veil-stream = { path = "../veil-stream" }
+veil-crypto = { path = "../veil-crypto" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+miette.workspace = true
+clap.workspace = true
+indicatif.workspace = true
+console.workspace = true
+rand.workspace = true
+base64.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+tempfile.workspace = true
+assert_cmd = "2.0"
+predicates = "3.1"

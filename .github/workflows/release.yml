@@ -1,0 +1,138 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Run tests
+        run: cargo test --workspace --all-features
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-features -- -D warnings
+
+  publish:
+    name: Publish to crates.io
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Login to crates.io
+        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
+
+      # Publish in dependency order
+      - name: Publish veil-parsers
+        run: cargo publish -p veil-parsers --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-detect
+        run: cargo publish -p veil-detect --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-redact
+        run: cargo publish -p veil-redact --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-crypto
+        run: cargo publish -p veil-crypto --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-policy
+        run: cargo publish -p veil-policy --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-audit
+        run: cargo publish -p veil-audit --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-discovery
+        run: cargo publish -p veil-discovery --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-office
+        run: cargo publish -p veil-office --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-email
+        run: cargo publish -p veil-email --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-stream
+        run: cargo publish -p veil-stream --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-batch
+        run: cargo publish -p veil-batch --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-api
+        run: cargo publish -p veil-api --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-cli
+        run: cargo publish -p veil-cli --allow-dirty || true
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-wasm
+        run: cargo publish -p veil-wasm --allow-dirty || true
+
+  github-release:
+    name: Create GitHub Release
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}

@@ -1,0 +1,22 @@
+Contact Information
+===================
+
+Name: John Doe
+Email: john.doe@example.com
+Phone: +43 664 1234567
+Alternative: +49 89 98765432
+
+Banking Details
+---------------
+IBAN: AT611904300234573201
+BIC: BKAUATWW
+
+Credit Card
+-----------
+Card Number: 4111 1111 1111 1111
+Expiry: 12/25
+CVV: 123
+
+Notes:
+Please contact jane.smith@company.org for billing questions.
+Emergency phone: 0043 1 2345678

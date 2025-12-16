@@ -1,0 +1,25 @@
+{
+  "company": "Acme Corp",
+  "contacts": [
+    {
+      "name": "John Doe",
+      "email": "john.doe@acme.com",
+      "phone": "+43 664 1234567",
+      "payment": {
+        "iban": "AT611904300234573201"
+      }
+    },
+    {
+      "name": "Jane Smith",
+      "email": "jane.smith@acme.com",
+      "phone": "+49 89 98765432",
+      "payment": {
+        "iban": "DE89370400440532013000"
+      }
+    }
+  ],
+  "billing": {
+    "credit_card": "4111111111111111",
+    "contact_email": "billing@acme.com"
+  }
+}

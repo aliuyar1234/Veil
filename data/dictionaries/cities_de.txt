@@ -1,0 +1,33 @@
+# German Cities
+# Source: Major German cities
+# Format: city<TAB>frequency (population-based)
+Berlin	0.95
+Hamburg	0.92
+München	0.91
+Köln	0.88
+Frankfurt	0.87
+Stuttgart	0.85
+Düsseldorf	0.83
+Leipzig	0.80
+Dortmund	0.79
+Essen	0.78
+Bremen	0.77
+Dresden	0.76
+Hannover	0.82
+Nürnberg	0.80
+Duisburg	0.75
+Bochum	0.74
+Wuppertal	0.73
+Bielefeld	0.72
+Bonn	0.81
+Münster	0.80
+Karlsruhe	0.79
+Mannheim	0.78
+Augsburg	0.77
+Wiesbaden	0.76
+Gelsenkirchen	0.70
+Mönchengladbach	0.69
+Braunschweig	0.68
+Chemnitz	0.67
+Kiel	0.74
+Aachen	0.75

@@ -1,0 +1,32 @@
+[package]
+name = "veil-email"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+description = "Email parsing for the Veil privacy platform"
+keywords = ["email", "parser", "eml", "msg", "privacy"]
+categories = ["email", "parser-implementations"]
+
+[dependencies]
+# Email parsing
+mailparse = { workspace = true }
+html2text = { workspace = true }
+encoding_rs = { workspace = true }
+msg_parser = "0.1"
+
+# Error handling and serialization
+thiserror = { workspace = true }
+serde = { workspace = true }
+
+# Integration with veil-parsers
+veil-parsers = { path = "../veil-parsers" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+veil-detect = { path = "../veil-detect" }
+
+[features]
+default = []

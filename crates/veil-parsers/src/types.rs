@@ -14,6 +14,18 @@ pub enum FileFormat {
     Json,
     /// HTML document (.html, .htm)
     Html,
+    /// PDF document (.pdf)
+    Pdf,
+    /// Word document (.docx)
+    Docx,
+    /// Excel spreadsheet (.xlsx)
+    Xlsx,
+    /// PowerPoint presentation (.pptx)
+    Pptx,
+    /// Email message (.eml)
+    Eml,
+    /// Microsoft Outlook message (.msg)
+    Msg,
 }
 
 /// Position information for a text segment.
@@ -53,6 +65,96 @@ pub enum Position {
         /// Byte length in original HTML.
         byte_length: usize,
     },
+    /// PDF document position.
+    Pdf {
+        /// Page number (1-indexed).
+        page: usize,
+        /// Left edge in PDF points (1/72 inch).
+        x: f32,
+        /// Bottom edge in PDF points.
+        y: f32,
+        /// Width in PDF points.
+        width: f32,
+        /// Height in PDF points.
+        height: f32,
+        /// Cumulative byte offset (for Finding compatibility).
+        byte_offset: usize,
+        /// Byte length of the text.
+        byte_length: usize,
+    },
+    /// Word document (.docx) position.
+    Docx {
+        /// Section type (body, header, footer, table, etc.).
+        section: String,
+        /// Paragraph number (1-indexed).
+        paragraph: usize,
+        /// Character offset within the paragraph.
+        char_offset: usize,
+        /// Character length.
+        char_length: usize,
+        /// Table cell location if within a table.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        table_cell: Option<TableCell>,
+    },
+    /// Excel spreadsheet (.xlsx) position.
+    Xlsx {
+        /// Sheet name.
+        sheet: String,
+        /// Row number (1-indexed).
+        row: usize,
+        /// Column index (0-indexed).
+        column: usize,
+        /// Column letter (A, B, ..., Z, AA, AB, ...).
+        column_letter: String,
+        /// Full cell reference (e.g., "Sheet1!A1").
+        cell_ref: String,
+        /// Whether the sheet is hidden.
+        hidden_sheet: bool,
+    },
+    /// PowerPoint presentation (.pptx) position.
+    Pptx {
+        /// Slide number (1-indexed).
+        slide: usize,
+        /// Element type (title, body, note, shape, table).
+        element: String,
+        /// Text element index within the slide.
+        text_index: usize,
+        /// Character offset within the text element.
+        char_offset: usize,
+        /// Character length.
+        char_length: usize,
+    },
+    /// Office document metadata field.
+    OfficeMetadata {
+        /// Field name (creator, title, company, etc.).
+        field: String,
+    },
+    /// Email message position.
+    Email {
+        /// Field name (from_address, to_name, subject, body, etc.).
+        field: String,
+        /// Field index for repeated headers.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        field_index: Option<usize>,
+        /// Part index for multipart bodies or address lists.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        part_index: Option<usize>,
+        /// Byte offset within the field.
+        byte_offset: usize,
+        /// Byte length.
+        byte_length: usize,
+    },
+}
+
+/// Table cell position in a Word document.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TableCell {
+    /// Table index in the document (1-indexed).
+    pub table_index: usize,
+    /// Row number (1-indexed).
+    pub row: usize,
+    /// Column number (1-indexed).
+    pub column: usize,
 }
 
 /// A segment of extracted text with position metadata.

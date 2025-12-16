@@ -1,0 +1,20 @@
+[package]
+name = "veil-discovery"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+veil-parsers = { path = "../veil-parsers" }
+veil-detect = { path = "../veil-detect" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+walkdir.workspace = true
+glob.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+tempfile.workspace = true

@@ -1,0 +1,33 @@
+# Austrian Cities
+# Source: Major Austrian cities and municipalities
+# Format: city<TAB>frequency (population-based)
+Wien	0.95
+Graz	0.88
+Linz	0.85
+Salzburg	0.87
+Innsbruck	0.84
+Klagenfurt	0.78
+Villach	0.74
+Wels	0.73
+St. Pölten	0.76
+Dornbirn	0.72
+Wiener Neustadt	0.71
+Steyr	0.70
+Feldkirch	0.69
+Bregenz	0.75
+Leonding	0.65
+Klosterneuburg	0.66
+Baden	0.68
+Wolfsberg	0.63
+Leoben	0.64
+Krems	0.67
+Amstetten	0.62
+Traun	0.61
+Kapfenberg	0.60
+Lustenau	0.59
+Mödling	0.65
+Hallein	0.58
+Braunau	0.57
+Kufstein	0.63
+Schwechat	0.60
+Spittal	0.55

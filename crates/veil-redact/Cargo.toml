@@ -1,0 +1,16 @@
+[package]
+name = "veil-redact"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "PII redaction engine with multiple styles"
+keywords = ["pii", "privacy", "redaction", "masking"]
+categories = ["text-processing"]
+
+[dependencies]
+veil-detect = { path = "../veil-detect" }
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true

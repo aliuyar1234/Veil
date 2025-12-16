@@ -1,0 +1,33 @@
+[package]
+name = "veil-batch"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Core
+serde = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+# File operations
+walkdir = { workspace = true }
+glob = { workspace = true }
+infer = { workspace = true }
+
+# Archives
+zip = { workspace = true }
+
+# Parallelism
+rayon = { workspace = true }
+
+# Progress
+indicatif = { workspace = true }
+
+# Veil crates
+veil-parsers = { path = "../veil-parsers" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+pretty_assertions = { workspace = true }

@@ -1,0 +1,27 @@
+From: sender@example.com
+To: recipient@example.com
+Subject: Multipart Alternative Email
+Date: Wed, 17 Dec 2024 09:15:00 +0000
+Message-ID: <multipart789@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="boundary123"
+
+--boundary123
+Content-Type: text/plain; charset="UTF-8"
+
+This is the plain text version.
+Contact: support@example.com
+Phone: 1-800-555-0123
+
+--boundary123
+Content-Type: text/html; charset="UTF-8"
+
+<html>
+<body>
+<p>This is the <strong>HTML version</strong>.</p>
+<p>Contact: <a href="mailto:support@example.com">support@example.com</a></p>
+<p>Phone: 1-800-555-0123</p>
+</body>
+</html>
+
+--boundary123--

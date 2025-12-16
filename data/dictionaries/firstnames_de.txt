@@ -1,0 +1,33 @@
+# German First Names
+# Source: Common German first names
+# Format: name<TAB>frequency (0.0-1.0)
+Max	0.85
+Maria	0.92
+Maximilian	0.80
+Anna	0.90
+Hans	0.82
+Peter	0.83
+Klaus	0.78
+Wolfgang	0.76
+Michael	0.88
+Thomas	0.87
+Stefan	0.84
+Andreas	0.83
+Martin	0.81
+Christian	0.80
+Daniel	0.79
+Markus	0.78
+Frank	0.77
+Julia	0.89
+Lisa	0.87
+Sarah	0.86
+Katharina	0.84
+Sophie	0.83
+Laura	0.82
+Lena	0.81
+Emma	0.90
+Marie	0.88
+Luisa	0.80
+Franziska	0.79
+Christina	0.78
+Sandra	0.77

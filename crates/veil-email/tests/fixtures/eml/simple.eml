@@ -1,0 +1,13 @@
+From: sender@example.com
+To: recipient@example.com
+Subject: Simple Test Email
+Date: Mon, 15 Dec 2024 10:00:00 +0000
+Message-ID: <simple123@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+
+This is a simple test email with plain text content.
+
+The sender's email is sender@example.com and phone is 555-123-4567.
+Credit card: 4111-1111-1111-1111
+SSN: 123-45-6789

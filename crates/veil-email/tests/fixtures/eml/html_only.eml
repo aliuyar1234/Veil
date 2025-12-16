@@ -1,0 +1,20 @@
+From: marketing@example.com
+To: customer@example.com
+Subject: HTML Only Newsletter
+Date: Thu, 18 Dec 2024 11:00:00 +0000
+Message-ID: <htmlonly@example.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset="UTF-8"
+
+<!DOCTYPE html>
+<html>
+<head><title>Newsletter</title></head>
+<body>
+<h1>Welcome to Our Newsletter!</h1>
+<p>Dear Customer,</p>
+<p>Thank you for subscribing to our newsletter.</p>
+<p>Contact us at <a href="mailto:info@example.com">info@example.com</a></p>
+<p>Call us: 555-CALL-NOW (555-225-5669)</p>
+<p>Visit: <a href="https://example.com">https://example.com</a></p>
+</body>
+</html>

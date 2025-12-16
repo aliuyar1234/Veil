@@ -15,5 +15,11 @@ csv.workspace = true
 encoding_rs.workspace = true
 scraper.workspace = true
 
+# PDF parsing
+pdf-extract.workspace = true
+
 [dev-dependencies]
 pretty_assertions.workspace = true
+tempfile.workspace = true
+lopdf.workspace = true
+veil-detect = { path = "../veil-detect" }

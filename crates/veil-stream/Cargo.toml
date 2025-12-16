@@ -1,0 +1,21 @@
+[package]
+name = "veil-stream"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Real-time streaming PII detection and processing"
+keywords = ["pii", "privacy", "streaming", "detection"]
+categories = ["text-processing"]
+
+[dependencies]
+# Veil crates
+veil-detect = { path = "../veil-detect" }
+
+# Core
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+tempfile.workspace = true

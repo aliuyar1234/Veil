@@ -1,0 +1,78 @@
+# Veil Context Rules - English
+# These rules boost or suppress PII detection based on surrounding context
+
+version: "1.0"
+language: en
+description: "English context markers for person names, suppression patterns, and labels"
+
+rules:
+  # Honorifics - boost confidence for names following these
+  - pattern: "(?i)\\b(mr|mrs|ms|miss|dr|prof|rev|hon|sir|lady)\\.?\\s+"
+    action: boost
+    weight: 0.3
+    category: PersonName
+    description: "Common English honorifics"
+
+  - pattern: "(?i)\\bdear\\s+"
+    action: boost
+    weight: 0.25
+    category: PersonName
+    description: "Letter salutation"
+
+  - pattern: "(?i)\\b(signed|signed by|from|regards|sincerely|yours)\\s*:?\\s*"
+    action: boost
+    weight: 0.25
+    category: PersonName
+    description: "Email/letter signature markers"
+
+  - pattern: "(?i)\\b(contact|contact person|name|full name|customer name)\\s*:?\\s*"
+    action: boost
+    weight: 0.3
+    category: PersonName
+    description: "Name labels"
+
+  # Email labels - boost confidence
+  - pattern: "(?i)\\b(email|e-mail|mail)\\s*:?\\s*"
+    action: boost
+    weight: 0.35
+    category: Email
+    description: "Email field labels"
+
+  # Phone labels - boost confidence
+  - pattern: "(?i)\\b(phone|telephone|tel|mobile|cell|fax)\\s*:?\\s*"
+    action: boost
+    weight: 0.35
+    category: Phone
+    description: "Phone field labels"
+
+  # Address labels - boost confidence
+  - pattern: "(?i)\\b(address|street|mailing address|postal address)\\s*:?\\s*"
+    action: boost
+    weight: 0.3
+    category: Address
+    description: "Address field labels"
+
+  # Suppression patterns - reduce false positives
+  - pattern: "(?i)\\bv(ersion)?\\s*\\d"
+    action: suppress
+    weight: 0.6
+    category: Ipv4
+    description: "Version numbers that look like IPs"
+
+  - pattern: "(?i)\\b(order|order number|order #|order no)\\s*:?\\s*"
+    action: suppress
+    weight: 0.5
+    category: CreditCard
+    description: "Order numbers that look like credit cards"
+
+  - pattern: "(?i)\\b(isbn|sku|product code|part number|item #)\\s*:?\\s*"
+    action: suppress
+    weight: 0.5
+    category: CreditCard
+    description: "Product identifiers"
+
+  - pattern: "(?i)\\b(internal|private|localhost|loopback)\\s+"
+    action: suppress
+    weight: 0.4
+    category: Ipv4
+    description: "Internal/private network context"
