@@ -8,8 +8,9 @@ use crate::context::ContextAnalyzer;
 use crate::detector::Detector;
 use crate::finding::{Finding, ValidationStatus};
 use crate::patterns::{
-    CreditCardDetector, DriversLicenseDetector, EmailDetector, IbanDetector, PassportDetector,
-    PhoneDetector, SsnDetector,
+    AhvChDetector, CreditCardDetector, DriversLicenseDetector, EmailDetector, IbanDetector,
+    NationalIdDeDetector, PassportDetector, PhoneDetector, SsnDetector, TaxIdDeDetector,
+    VatNumberDetector,
 };
 
 /// Registry of PII detectors.
@@ -192,6 +193,12 @@ impl Default for DetectorRegistry {
         registry.register(Box::new(SsnDetector::new()));
         registry.register(Box::new(PassportDetector::new()));
         registry.register(Box::new(DriversLicenseDetector::new()));
+
+        // Register EU/DACH-specific detectors
+        registry.register(Box::new(TaxIdDeDetector::new()));
+        registry.register(Box::new(AhvChDetector::new()));
+        registry.register(Box::new(NationalIdDeDetector::new()));
+        registry.register(Box::new(VatNumberDetector::new()));
 
         registry
     }

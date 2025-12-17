@@ -21,6 +21,14 @@ pub enum PiiCategory {
     SvnrDe,
     /// Tax identification number
     TaxId,
+    /// German Tax ID (Steueridentifikationsnummer)
+    TaxIdDe,
+    /// Swiss AHV Number (AHVN13)
+    AhvCh,
+    /// German National ID (Personalausweis)
+    NationalIdDe,
+    /// EU VAT Number
+    VatNumber,
     /// IPv4 address
     Ipv4,
     /// IPv6 address
@@ -47,6 +55,10 @@ impl fmt::Display for PiiCategory {
             PiiCategory::SvnrAt => write!(f, "SVNR_AT"),
             PiiCategory::SvnrDe => write!(f, "SVNR_DE"),
             PiiCategory::TaxId => write!(f, "TAX_ID"),
+            PiiCategory::TaxIdDe => write!(f, "TAX_ID_DE"),
+            PiiCategory::AhvCh => write!(f, "AHV_CH"),
+            PiiCategory::NationalIdDe => write!(f, "NATIONAL_ID_DE"),
+            PiiCategory::VatNumber => write!(f, "VAT_NUMBER"),
             PiiCategory::Ipv4 => write!(f, "IPV4"),
             PiiCategory::Ipv6 => write!(f, "IPV6"),
             PiiCategory::MacAddress => write!(f, "MAC_ADDRESS"),
@@ -69,6 +81,10 @@ impl PiiCategory {
             PiiCategory::SvnrAt => "svnr_at",
             PiiCategory::SvnrDe => "svnr_de",
             PiiCategory::TaxId => "tax_id",
+            PiiCategory::TaxIdDe => "tax_id_de",
+            PiiCategory::AhvCh => "ahv_ch",
+            PiiCategory::NationalIdDe => "national_id_de",
+            PiiCategory::VatNumber => "vat_number",
             PiiCategory::Ipv4 => "ipv4",
             PiiCategory::Ipv6 => "ipv6",
             PiiCategory::MacAddress => "mac_address",

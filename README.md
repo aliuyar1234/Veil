@@ -38,9 +38,10 @@ All of this happens in seconds, not hours.
 |----------|---------------|
 | **Personal Identity** | Names, Social Security Numbers, Passport Numbers, Driver's License Numbers |
 | **Contact Information** | Email addresses, Phone numbers (US, UK, EU, international), Physical addresses |
-| **Financial Data** | Credit card numbers, Bank accounts, IBANs |
+| **Financial Data** | Credit card numbers, Bank accounts, IBANs, EU VAT Numbers |
 | **Health Information** | Medical record numbers (HIPAA compliance) |
 | **Technical Data** | IP addresses, MAC addresses |
+| **EU/DACH Region** | German Tax ID (Steuer-ID), Swiss AHV Number, German National ID (Personalausweis), VAT Numbers (DE, AT, CH, FR, IT, ES, NL, BE, PL, UK, and more) |
 
 Veil supports documents in many formats:
 - **Text files** (TXT, CSV, JSON, XML, HTML)
