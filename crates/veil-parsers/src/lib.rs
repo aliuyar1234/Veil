@@ -10,7 +10,8 @@
 //!
 //! let result = parse_file("document.txt", &ParseOptions::default())?;
 //! for segment in result.segments {
-//!     println!("{}", segment.content);
+//!     // Use .as_str() for intentional output (content is redacted by default)
+//!     println!("{}", segment.content.as_str());
 //! }
 //! ```
 

@@ -70,6 +70,11 @@ pub struct ProtectOptions {
     /// Whether to include findings in response.
     #[serde(default = "default_include_findings")]
     pub include_findings: bool,
+
+    /// Include matched PII values in findings (default: false for security).
+    /// Requires X-Acknowledge-PII-Exposure header when true.
+    #[serde(default)]
+    pub include_values: bool,
 }
 
 fn default_include_findings() -> bool {

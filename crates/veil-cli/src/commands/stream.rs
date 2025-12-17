@@ -27,7 +27,7 @@ pub fn run(_args: StreamArgs, _quiet: bool, json: bool) -> Result<()> {
 
         // Create segment for this line
         let segment = TextSegment {
-            content: line.clone(),
+            content: line.clone().into(),
             position: Position::Text {
                 line: line_number,
                 column: 1,

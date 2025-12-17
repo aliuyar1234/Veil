@@ -64,6 +64,9 @@ fake = { version = "2.9", features = ["derive"] }
 pretty_assertions = "1.4"
 tempfile = "3.10"
 
+# TTY detection
+atty = "0.2"
+
 # Batch processing
 walkdir = "2.5"
 glob = "0.3"
@@ -99,3 +102,13 @@ mime = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 toml = "0.8"
+
+# Optimized release profile for WASM builds
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+
+# WASM-specific: strip debug symbols for smaller size
+[profile.release.package.veil-wasm]
+strip = true

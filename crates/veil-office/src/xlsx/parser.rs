@@ -45,7 +45,7 @@ pub fn parse_xlsx<R: Read + Seek + BufRead + Clone>(reader: R) -> Result<ParseRe
                         total_chars += cell_text.len();
 
                         segments.push(TextSegment {
-                            content: cell_text,
+                            content: cell_text.into(),
                             position: Position::Xlsx {
                                 sheet: sheet_name.clone(),
                                 row: row_idx + 1, // 1-based

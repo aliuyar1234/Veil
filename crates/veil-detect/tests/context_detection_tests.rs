@@ -6,7 +6,7 @@ use veil_parsers::{Position, TextSegment};
 
 fn make_segment(content: &str) -> TextSegment {
     TextSegment {
-        content: content.to_string(),
+        content: content.to_string().into(),
         position: Position::Text {
             line: 1,
             column: 1,

@@ -6,10 +6,32 @@ use crate::progress::ProgressState;
 use crate::types::{BatchOptions, BatchSummary, FileEntry, FileResult};
 use rayon::prelude::*;
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
 use uuid::Uuid;
 use veil_parsers::FileFormat;
+
+/// Build a thread pool with the specified number of threads.
+/// Falls back to a single-threaded pool if construction fails.
+fn build_thread_pool(num_threads: usize) -> rayon::ThreadPool {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(num_threads)
+        .build()
+        .unwrap_or_else(|e| {
+            tracing::warn!("Failed to build thread pool with {} threads: {}, using single thread", num_threads, e);
+            // Fallback: try with 1 thread, and if that fails, use the global pool
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(1)
+                .build()
+                .expect("Failed to create even a single-threaded pool - system resource exhaustion")
+        })
+}
+
+/// Safely lock a mutex, recovering from poisoning by returning the inner data.
+/// This is acceptable for statistics where we prefer partial data over failure.
+fn lock_stats<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 /// Statistics collected during streaming processing.
 #[derive(Debug, Default)]
@@ -46,20 +68,12 @@ where
     let total_files = files.len();
 
     // Configure thread pool
-    let pool = if let Some(parallelism) = options.max_parallelism {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(parallelism)
-            .build()
-            .unwrap_or_else(|_| rayon::ThreadPoolBuilder::new().build().unwrap())
-    } else {
-        let num_threads = std::thread::available_parallelism()
+    let num_threads = options.max_parallelism.unwrap_or_else(|| {
+        std::thread::available_parallelism()
             .map(|n| n.get().saturating_sub(1).max(1))
-            .unwrap_or(1);
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_threads)
-            .build()
-            .unwrap_or_else(|_| rayon::ThreadPoolBuilder::new().build().unwrap())
-    };
+            .unwrap_or(1)
+    });
+    let pool = build_thread_pool(num_threads);
 
     // Create channel for results
     let (tx, rx) = mpsc::channel::<FileResult>();
@@ -70,8 +84,9 @@ where
     let callback = Arc::new(callback);
     let receiver_handle = std::thread::spawn(move || {
         for result in rx {
-            // Update stats
-            if let Ok(mut s) = stats_clone.lock() {
+            // Update stats (recovers from mutex poisoning to preserve partial data)
+            {
+                let mut s = lock_stats(&stats_clone);
                 s.total_chars += result.result.total_chars;
                 s.total_segments += result.result.segments.len();
             }
@@ -95,9 +110,7 @@ where
                         prog.increment_processed();
                         prog.increment_successful();
                     }
-                    if let Ok(mut s) = stats.lock() {
-                        s.successful += 1;
-                    }
+                    lock_stats(&stats).successful += 1;
                     // Send result to receiver thread
                     let _ = tx.send(result);
                 }
@@ -107,17 +120,13 @@ where
                             prog.increment_processed();
                             prog.increment_skipped();
                         }
-                        if let Ok(mut s) = stats.lock() {
-                            s.skipped += 1;
-                        }
+                        lock_stats(&stats).skipped += 1;
                     } else {
                         if let Some(ref prog) = progress {
                             prog.increment_processed();
                             prog.increment_failed();
                         }
-                        if let Ok(mut s) = stats.lock() {
-                            s.failed += 1;
-                        }
+                        lock_stats(&stats).failed += 1;
                     }
                 }
             }
@@ -126,11 +135,14 @@ where
 
     // Close channel and wait for receiver
     drop(tx);
-    receiver_handle.join().unwrap();
+    // If receiver thread panicked, log warning but continue with partial stats
+    if let Err(e) = receiver_handle.join() {
+        tracing::warn!("Receiver thread panicked: {:?}", e);
+    }
 
-    // Build summary
+    // Build summary (recovers from mutex poisoning)
     let duration = start_time.elapsed();
-    let final_stats = stats.lock().unwrap();
+    let final_stats = lock_stats(&stats);
 
     Ok(BatchSummary {
         job_id,

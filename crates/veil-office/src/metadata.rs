@@ -92,7 +92,7 @@ impl OfficeMetadata {
 
     fn create_segment(field: &str, value: &str) -> TextSegment {
         TextSegment {
-            content: value.to_string(),
+            content: value.to_string().into(),
             position: Position::OfficeMetadata {
                 field: field.to_string(),
             },
@@ -239,8 +239,8 @@ mod tests {
         let segments = metadata.to_text_segments();
 
         assert_eq!(segments.len(), 3);
-        assert!(segments.iter().any(|s| s.content == "John Doe"));
-        assert!(segments.iter().any(|s| s.content == "Acme Corp"));
+        assert!(segments.iter().any(|s| s.content.as_str() == "John Doe"));
+        assert!(segments.iter().any(|s| s.content.as_str() == "Acme Corp"));
     }
 
     #[test]

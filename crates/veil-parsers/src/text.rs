@@ -102,7 +102,7 @@ fn parse_lines(content: &str) -> Vec<TextSegment> {
         let line_num = line_idx + 1;
 
         segments.push(TextSegment {
-            content: line.to_string(),
+            content: line.to_string().into(),
             position: Position::Text {
                 line: line_num,
                 column: 1,
@@ -131,8 +131,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.segments.len(), 2);
-        assert_eq!(result.segments[0].content, "Hello");
-        assert_eq!(result.segments[1].content, "World");
+        assert_eq!(result.segments[0].content.as_str(), "Hello");
+        assert_eq!(result.segments[1].content.as_str(), "World");
     }
 
     #[test]

@@ -179,6 +179,37 @@ impl Default for AuthConfig {
     }
 }
 
+/// Minimum recommended JWT secret length (256 bits = 32 bytes).
+const MIN_JWT_SECRET_LENGTH: usize = 32;
+
+impl AuthConfig {
+    /// Validate the authentication configuration.
+    /// Returns an error message if the configuration is invalid.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.enabled {
+            match &self.jwt_secret {
+                None => {
+                    return Err(
+                        "Authentication is enabled but no JWT secret is configured. \
+                         Set VEIL_JWT_SECRET environment variable or jwt_secret in config."
+                            .to_string(),
+                    );
+                }
+                Some(secret) if secret.len() < MIN_JWT_SECRET_LENGTH => {
+                    return Err(format!(
+                        "JWT secret is too short ({} bytes). \
+                         Use at least {} bytes for security.",
+                        secret.len(),
+                        MIN_JWT_SECRET_LENGTH
+                    ));
+                }
+                Some(_) => {}
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Default for RateLimitConfig {
     fn default() -> Self {
         Self {
@@ -194,7 +225,13 @@ impl Default for CorsConfig {
     fn default() -> Self {
         Self {
             enabled: default_cors_enabled(),
-            allowed_origins: Vec::new(),
+            // Default to localhost only for security - production should configure explicitly
+            allowed_origins: vec![
+                "http://localhost:3000".to_string(),
+                "http://localhost:8080".to_string(),
+                "http://127.0.0.1:3000".to_string(),
+                "http://127.0.0.1:8080".to_string(),
+            ],
             allowed_methods: default_allowed_methods(),
             allowed_headers: default_allowed_headers(),
             max_age_secs: default_max_age(),

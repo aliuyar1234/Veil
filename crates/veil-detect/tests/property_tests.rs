@@ -8,7 +8,14 @@ use proptest::prelude::*;
 // or re-export them. For now, we'll implement the algorithms locally for testing.
 
 /// Luhn algorithm implementation for testing.
+/// Returns false if the input contains any non-digit characters (except spaces/hyphens).
 fn validate_luhn(number: &str) -> bool {
+    // Credit card numbers can only contain digits, spaces, and hyphens
+    // Any alphabetic or other characters make it invalid
+    if number.chars().any(|c| !c.is_ascii_digit() && c != ' ' && c != '-') {
+        return false;
+    }
+
     let digits: Vec<u32> = number
         .chars()
         .filter(|c| c.is_ascii_digit())

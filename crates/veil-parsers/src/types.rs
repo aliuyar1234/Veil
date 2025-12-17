@@ -1,6 +1,7 @@
 //! Core types for the parsing library.
 
 use serde::{Deserialize, Serialize};
+use veil_core::SensitiveString;
 
 /// Supported file formats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -160,8 +161,8 @@ pub struct TableCell {
 /// A segment of extracted text with position metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextSegment {
-    /// The extracted text content.
-    pub content: String,
+    /// The extracted text content (securely zeroed on drop).
+    pub content: SensitiveString,
     /// Position in the original document.
     pub position: Position,
 }

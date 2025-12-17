@@ -2,6 +2,7 @@
 
 use axum::{
     extract::{Multipart, Query, State},
+    http::HeaderMap,
     Json,
 };
 use std::time::Instant;
@@ -12,14 +13,39 @@ use crate::models::{Finding, PositionInfo, ScanOptions, ScanResponse, ScanStats}
 use crate::security::sanitize_filename;
 use crate::AppState;
 
+/// Header name for PII exposure acknowledgment.
+const PII_ACKNOWLEDGE_HEADER: &str = "x-acknowledge-pii-exposure";
+
 /// POST /api/v1/scan - Scan a file for PII.
 pub async fn scan_file(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Query(options): Query<ScanOptions>,
     mut multipart: Multipart,
 ) -> ApiResult<Json<ScanResponse>> {
     let start_time = Instant::now();
     let request_id = Uuid::new_v4().to_string();
+
+    // Validate PII exposure acknowledgment if include_values is requested
+    let include_values = if options.include_values {
+        // Check for acknowledgment header
+        let acknowledged = headers
+            .get(PII_ACKNOWLEDGE_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.eq_ignore_ascii_case("accepted"))
+            .unwrap_or(false);
+
+        if !acknowledged {
+            return Err(ApiError::BadRequest(
+                "The include_values parameter requires explicit acknowledgment. \
+                 Add header 'X-Acknowledge-PII-Exposure: accepted' to confirm you understand \
+                 the security implications of including PII values in the response.".to_string()
+            ));
+        }
+        true
+    } else {
+        false
+    };
 
     // Extract file from multipart
     let (filename, data) = extract_file(&mut multipart, state.config.max_body_size).await?;
@@ -73,9 +99,17 @@ pub async fn scan_file(
 
         stats.add_finding(&category);
 
+        // Only include PII value if explicitly requested and acknowledged
+        // Use .as_str() to get the actual value (Display is intentionally redacted)
+        let value = if include_values {
+            Some(detection.matched_text.as_str().to_string())
+        } else {
+            None
+        };
+
         findings.push(Finding {
             category,
-            value: detection.matched_text.clone(),
+            value,
             confidence: detection.confidence as f64,
             start: detection.start,
             end: detection.end,

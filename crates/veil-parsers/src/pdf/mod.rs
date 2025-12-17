@@ -106,7 +106,7 @@ impl PdfParser {
                 let byte_length = content.len();
 
                 segments.push(TextSegment {
-                    content,
+                    content: content.into(),
                     position: Position::Pdf {
                         page: current_page,
                         x: 0.0,     // pdf-extract doesn't provide position
@@ -137,7 +137,7 @@ impl PdfParser {
                 let byte_length = content.len();
 
                 segments.push(TextSegment {
-                    content,
+                    content: content.into(),
                     position: Position::Pdf {
                         page: 1,
                         x: 0.0,
@@ -156,7 +156,7 @@ impl PdfParser {
         // If still empty but text exists, create one segment
         if segments.is_empty() && !text.is_empty() {
             segments.push(TextSegment {
-                content: text.to_string(),
+                content: text.to_string().into(),
                 position: Position::Pdf {
                     page: 1,
                     x: 0.0,
@@ -202,7 +202,7 @@ mod tests {
         let parser = PdfParser::new();
         let segments = parser.create_segments("Hello World");
         assert_eq!(segments.len(), 1);
-        assert_eq!(segments[0].content, "Hello World");
+        assert_eq!(segments[0].content.as_str(), "Hello World");
     }
 
     #[test]
@@ -210,8 +210,8 @@ mod tests {
         let parser = PdfParser::new();
         let segments = parser.create_segments("First paragraph.\n\nSecond paragraph.");
         assert_eq!(segments.len(), 2);
-        assert_eq!(segments[0].content, "First paragraph.");
-        assert_eq!(segments[1].content, "Second paragraph.");
+        assert_eq!(segments[0].content.as_str(), "First paragraph.");
+        assert_eq!(segments[1].content.as_str(), "Second paragraph.");
     }
 
     #[test]

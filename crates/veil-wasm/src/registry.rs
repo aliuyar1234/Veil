@@ -34,7 +34,7 @@ mod tests {
     fn test_registry_functional() {
         let registry = get_registry();
         let segment = veil_parsers::TextSegment {
-            content: "Contact: test@example.com".to_string(),
+            content: "Contact: test@example.com".to_string().into(),
             position: veil_parsers::Position::Text {
                 line: 1,
                 column: 1,

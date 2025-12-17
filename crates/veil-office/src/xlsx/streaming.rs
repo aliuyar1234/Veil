@@ -119,7 +119,7 @@ pub fn parse_xlsx_streaming<R: Read + Seek + BufRead + Clone>(
                         memory_estimate += cell_text.len() + 100; // Rough estimate
 
                         row_segments.push(TextSegment {
-                            content: cell_text,
+                            content: cell_text.into(),
                             position: Position::Xlsx {
                                 sheet: sheet_name.clone(),
                                 row: row_idx + 1,

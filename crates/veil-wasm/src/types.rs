@@ -11,8 +11,9 @@ pub struct Finding {
     /// PII category (e.g., "email", "phone", "iban", "credit_card")
     pub category: String,
 
-    /// The matched text value
-    pub value: String,
+    /// The matched text value (only included when includeValues=true with acknowledgment)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
 
     /// Byte offset of match start in source
     pub start: usize,
@@ -28,14 +29,14 @@ impl Finding {
     /// Create a new finding.
     pub fn new(
         category: impl Into<String>,
-        value: impl Into<String>,
+        value: Option<String>,
         start: usize,
         end: usize,
         confidence: f64,
     ) -> Self {
         Self {
             category: category.into(),
-            value: value.into(),
+            value,
             start,
             end,
             confidence,
@@ -58,6 +59,14 @@ pub struct ScanOptions {
     /// Minimum confidence threshold (default: 0.0)
     #[serde(default)]
     pub min_confidence: Option<f64>,
+
+    /// Include matched PII values in response (default: false for security)
+    #[serde(default)]
+    pub include_values: bool,
+
+    /// Acknowledge that PII values will be exposed (required when include_values=true)
+    #[serde(default)]
+    pub acknowledge_exposure: bool,
 }
 
 /// Statistics about a scan operation.
@@ -220,12 +229,21 @@ mod tests {
 
     #[test]
     fn test_finding_new() {
-        let finding = Finding::new("email", "test@example.com", 10, 26, 0.95);
+        let finding = Finding::new("email", Some("test@example.com".to_string()), 10, 26, 0.95);
         assert_eq!(finding.category, "email");
-        assert_eq!(finding.value, "test@example.com");
+        assert_eq!(finding.value, Some("test@example.com".to_string()));
         assert_eq!(finding.start, 10);
         assert_eq!(finding.end, 26);
         assert!((finding.confidence - 0.95).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_finding_new_without_value() {
+        let finding = Finding::new("email", None, 10, 26, 0.95);
+        assert_eq!(finding.category, "email");
+        assert_eq!(finding.value, None);
+        assert_eq!(finding.start, 10);
+        assert_eq!(finding.end, 26);
     }
 
     #[test]
@@ -257,7 +275,7 @@ mod tests {
 
     #[test]
     fn test_scan_result_new() {
-        let findings = vec![Finding::new("email", "test@example.com", 0, 16, 0.9)];
+        let findings = vec![Finding::new("email", Some("test@example.com".to_string()), 0, 16, 0.9)];
         let stats = ScanStats::new(100, 10);
         let result = ScanResult::new(findings.clone(), stats);
 
@@ -297,11 +315,20 @@ mod tests {
     }
 
     #[test]
-    fn test_finding_serialization() {
-        let finding = Finding::new("email", "test@example.com", 0, 16, 0.9);
+    fn test_finding_serialization_with_value() {
+        let finding = Finding::new("email", Some("test@example.com".to_string()), 0, 16, 0.9);
         let json = serde_json::to_string(&finding).unwrap();
         assert!(json.contains("\"category\":\"email\""));
         assert!(json.contains("\"value\":\"test@example.com\""));
+    }
+
+    #[test]
+    fn test_finding_serialization_without_value() {
+        let finding = Finding::new("email", None, 0, 16, 0.9);
+        let json = serde_json::to_string(&finding).unwrap();
+        assert!(json.contains("\"category\":\"email\""));
+        // Value should be omitted entirely, not null
+        assert!(!json.contains("\"value\""));
     }
 
     #[test]
@@ -310,11 +337,23 @@ mod tests {
             filename: Some("test.txt".to_string()),
             categories: vec!["email".to_string()],
             min_confidence: Some(0.8),
+            ..Default::default()
         };
         let json = serde_json::to_string(&options).unwrap();
         // Check camelCase serialization
         assert!(json.contains("\"filename\""));
         assert!(json.contains("\"minConfidence\""));
+    }
+
+    #[test]
+    fn test_scan_options_include_values() {
+        let options = ScanOptions {
+            include_values: true,
+            acknowledge_exposure: true,
+            ..Default::default()
+        };
+        assert!(options.include_values);
+        assert!(options.acknowledge_exposure);
     }
 
     #[test]

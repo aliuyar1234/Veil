@@ -24,13 +24,22 @@ pub fn print_scan_result(result: &ScanResult) {
         println!("  No PII found");
     } else {
         for finding in &result.findings {
-            println!(
-                "  [{}] {} @ {} (confidence: {:.0}%)",
-                finding.category,
-                finding.text,
-                finding.position,
-                finding.confidence * 100.0
-            );
+            // Display text only if included, otherwise just show position
+            match &finding.text {
+                Some(text) => println!(
+                    "  [{}] {} @ {} (confidence: {:.0}%)",
+                    finding.category,
+                    text,
+                    finding.position,
+                    finding.confidence * 100.0
+                ),
+                None => println!(
+                    "  [{}] @ {} (confidence: {:.0}%)",
+                    finding.category,
+                    finding.position,
+                    finding.confidence * 100.0
+                ),
+            }
         }
     }
 }

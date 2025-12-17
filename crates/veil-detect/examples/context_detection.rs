@@ -39,7 +39,7 @@ fn demonstrate_detection(text: &str, language: &str) {
     println!("Language: {}", language);
 
     let segment = TextSegment {
-        content: text.to_string(),
+        content: text.to_string().into(),
         position: Position::Text {
             line: 1,
             column: 1,
@@ -62,7 +62,7 @@ fn demonstrate_detection(text: &str, language: &str) {
         for finding in findings {
             println!(
                 "  - {} ({:?}): \"{}\" [confidence: {:.2}]",
-                finding.category, finding.validation, finding.matched_text, finding.confidence
+                finding.category, finding.validation, finding.matched_text.as_str(), finding.confidence
             );
             if let Some(reasoning) = &finding.context_reasoning {
                 for reason in reasoning {

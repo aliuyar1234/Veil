@@ -37,11 +37,8 @@ getrandom.workspace = true
 [dev-dependencies]
 wasm-bindgen-test = "0.3.40"
 
-[profile.release]
-opt-level = "z"
-lto = true
-codegen-units = 1
-strip = true
+# Note: Profile settings are in workspace root Cargo.toml
+# to avoid "profiles for non root package will be ignored" warning
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-Oz"]

@@ -67,7 +67,14 @@ impl RateLimiter {
         let now = Instant::now();
         let window_duration = Duration::from_secs(self.config.period_secs);
 
-        let mut clients = self.clients.write().unwrap();
+        // Handle poisoned lock gracefully - allow request but log warning
+        let mut clients = match self.clients.write() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                tracing::warn!("Rate limiter lock poisoned, recovering");
+                poisoned.into_inner()
+            }
+        };
 
         let state = clients
             .entry(client_key.to_string())
@@ -103,7 +110,14 @@ impl RateLimiter {
         let now = Instant::now();
         let window_duration = Duration::from_secs(self.config.period_secs);
 
-        let mut clients = self.clients.write().unwrap();
+        // Handle poisoned lock gracefully
+        let mut clients = match self.clients.write() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                tracing::warn!("Rate limiter lock poisoned during cleanup, recovering");
+                poisoned.into_inner()
+            }
+        };
         clients.retain(|_, state| now.duration_since(state.window_start) < window_duration * 2);
     }
 }

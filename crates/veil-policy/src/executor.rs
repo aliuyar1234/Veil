@@ -149,7 +149,7 @@ impl PolicyExecutor {
         finding: &Finding,
         rule: &crate::rules::ProtectionRule,
     ) -> Result<ProtectedValue, PolicyError> {
-        let value = &finding.matched_text;
+        let value = finding.matched_text.as_str();
 
         // Check cache for consistent pseudonymization
         if rule.action == ProtectionAction::Pseudonymize && rule.consistent {
@@ -184,7 +184,7 @@ impl PolicyExecutor {
         // Cache for consistent pseudonymization
         if rule.action == ProtectionAction::Pseudonymize && rule.consistent {
             self.pseudonym_cache
-                .insert(value.clone(), protected.value.clone());
+                .insert(value.to_string(), protected.value.clone());
         }
 
         Ok(protected)

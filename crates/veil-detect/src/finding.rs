@@ -1,6 +1,7 @@
 //! PII finding types.
 
 use serde::{Deserialize, Serialize};
+use veil_core::SensitiveString;
 
 use crate::category::PiiCategory;
 
@@ -22,8 +23,8 @@ pub enum ValidationStatus {
 /// A detected PII instance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Finding {
-    /// The matched text.
-    pub matched_text: String,
+    /// The matched text (securely zeroed on drop).
+    pub matched_text: SensitiveString,
 
     /// PII category.
     pub category: PiiCategory,
@@ -60,7 +61,7 @@ impl Finding {
         segment_index: usize,
     ) -> Self {
         Self {
-            matched_text: matched_text.into(),
+            matched_text: SensitiveString::new(matched_text.into()),
             category,
             start,
             end,

@@ -151,6 +151,6 @@ Address: 123 Main Street
         result.findings.len()
     );
     for finding in &result.findings {
-        println!("  - {}: {}", finding.category, finding.matched_text);
+        println!("  - {}: {}", finding.category, finding.matched_text.as_str());
     }
 }

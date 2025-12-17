@@ -38,7 +38,7 @@ pub fn detect_pii(segments: &[TextSegment], registry: &DetectorRegistry) -> Vec<
 /// Detect PII in a single string using the default registry.
 pub fn detect_in_text(text: &str) -> Vec<Finding> {
     let segment = TextSegment {
-        content: text.to_string(),
+        content: text.to_string().into(),
         position: veil_parsers::Position::Text {
             line: 1,
             column: 1,

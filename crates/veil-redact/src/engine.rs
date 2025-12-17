@@ -97,7 +97,7 @@ impl RedactionEngine {
 
             // Record the redaction
             redactions.push(AppliedRedaction::new(
-                &finding.matched_text,
+                finding.matched_text.as_str(),
                 &replacement,
                 (original_start, original_end),
                 (adjusted_start, new_end),

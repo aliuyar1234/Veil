@@ -8,6 +8,7 @@ keywords = ["parser", "pii", "privacy", "text-extraction"]
 categories = ["parsing", "text-processing"]
 
 [dependencies]
+veil-core = { path = "../veil-core" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

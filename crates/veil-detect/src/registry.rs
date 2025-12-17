@@ -7,7 +7,10 @@ use veil_parsers::TextSegment;
 use crate::context::ContextAnalyzer;
 use crate::detector::Detector;
 use crate::finding::{Finding, ValidationStatus};
-use crate::patterns::{CreditCardDetector, EmailDetector, IbanDetector, PhoneDetector};
+use crate::patterns::{
+    CreditCardDetector, DriversLicenseDetector, EmailDetector, IbanDetector, PassportDetector,
+    PhoneDetector, SsnDetector,
+};
 
 /// Registry of PII detectors.
 pub struct DetectorRegistry {
@@ -185,6 +188,11 @@ impl Default for DetectorRegistry {
         registry.register(Box::new(PhoneDetector::new()));
         registry.register(Box::new(CreditCardDetector::new()));
 
+        // Register identity document detectors
+        registry.register(Box::new(SsnDetector::new()));
+        registry.register(Box::new(PassportDetector::new()));
+        registry.register(Box::new(DriversLicenseDetector::new()));
+
         registry
     }
 }
@@ -196,7 +204,7 @@ mod tests {
 
     fn make_segment(content: &str) -> TextSegment {
         TextSegment {
-            content: content.to_string(),
+            content: content.to_string().into(),
             position: Position::Text {
                 line: 1,
                 column: 1,
@@ -213,7 +221,7 @@ mod tests {
         let findings = registry.detect_all(&segments);
 
         assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].matched_text, "john@example.com");
+        assert_eq!(findings[0].matched_text.as_str(), "john@example.com");
     }
 
     #[test]

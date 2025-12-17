@@ -27,6 +27,12 @@ pub enum PiiCategory {
     Ipv6,
     /// MAC address
     MacAddress,
+    /// US Social Security Number
+    Ssn,
+    /// Passport number
+    Passport,
+    /// Driver's license number
+    DriversLicense,
     /// Custom category
     Custom(String),
 }
@@ -44,6 +50,9 @@ impl fmt::Display for PiiCategory {
             PiiCategory::Ipv4 => write!(f, "IPV4"),
             PiiCategory::Ipv6 => write!(f, "IPV6"),
             PiiCategory::MacAddress => write!(f, "MAC_ADDRESS"),
+            PiiCategory::Ssn => write!(f, "SSN"),
+            PiiCategory::Passport => write!(f, "PASSPORT"),
+            PiiCategory::DriversLicense => write!(f, "DRIVERS_LICENSE"),
             PiiCategory::Custom(name) => write!(f, "{}", name.to_uppercase()),
         }
     }
@@ -63,6 +72,9 @@ impl PiiCategory {
             PiiCategory::Ipv4 => "ipv4",
             PiiCategory::Ipv6 => "ipv6",
             PiiCategory::MacAddress => "mac_address",
+            PiiCategory::Ssn => "ssn",
+            PiiCategory::Passport => "passport",
+            PiiCategory::DriversLicense => "drivers_license",
             PiiCategory::Custom(name) => name,
         }
     }

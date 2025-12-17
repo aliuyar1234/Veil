@@ -25,6 +25,39 @@ const PDF_EXTENSIONS: &[&str] = &["pdf"];
 
 /// Run the scan command.
 pub fn run(args: ScanArgs, quiet: bool, json: bool) -> Result<()> {
+    // Handle --include-values confirmation
+    let include_values = if args.include_values {
+        if args.yes {
+            // --yes flag bypasses confirmation
+            if !quiet && !json {
+                eprintln!("Warning: Including PII values in output (--yes flag used)");
+            }
+            true
+        } else if atty::is(atty::Stream::Stdin) {
+            // Interactive mode: prompt for confirmation
+            eprintln!("WARNING: Including PII values exposes sensitive data in output.");
+            eprintln!("This may be captured in logs, terminal history, or other systems.");
+            eprint!("Do you understand the security implications? (yes/no): ");
+
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input).into_diagnostic()?;
+
+            if input.trim().eq_ignore_ascii_case("yes") {
+                true
+            } else {
+                eprintln!("Aborted. Use --include-values --yes to skip this prompt.");
+                return Ok(());
+            }
+        } else {
+            // Non-interactive mode without --yes: reject
+            return Err(miette::miette!(
+                "The --include-values flag requires --yes in non-interactive mode"
+            ));
+        }
+    } else {
+        false
+    };
+
     // Load policy
     let policy = match &args.policy {
         Some(path) => load_policy(path).into_diagnostic()?,
@@ -38,7 +71,7 @@ pub fn run(args: ScanArgs, quiet: bool, json: bool) -> Result<()> {
     for path in &args.paths {
         if path.is_dir() {
             if args.recursive {
-                scan_directory(path, &registry, &policy, quiet, json, &mut all_results)?;
+                scan_directory(path, &registry, &policy, quiet, json, include_values, &mut all_results)?;
             } else if !quiet && !json {
                 eprintln!(
                     "Skipping directory: {} (use -r for recursive)",
@@ -46,7 +79,7 @@ pub fn run(args: ScanArgs, quiet: bool, json: bool) -> Result<()> {
                 );
             }
         } else {
-            match scan_file(path, &registry, &policy, quiet) {
+            match scan_file(path, &registry, &policy, quiet, include_values) {
                 Ok(result) => {
                     total_findings += result.findings_count;
                     all_results.push(result);
@@ -93,7 +126,8 @@ pub struct ScanResult {
 #[derive(serde::Serialize)]
 pub struct FindingOutput {
     pub category: String,
-    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
     pub position: String,
     pub confidence: f32,
 }
@@ -103,6 +137,7 @@ fn scan_file(
     registry: &DetectorRegistry,
     policy: &veil_policy::Policy,
     quiet: bool,
+    include_values: bool,
 ) -> Result<ScanResult> {
     if !quiet {
         eprintln!("Scanning: {}", path.display());
@@ -135,7 +170,13 @@ fn scan_file(
         .iter()
         .map(|f| FindingOutput {
             category: f.category.to_string(),
-            text: f.matched_text.clone(),
+            // Only include PII text if explicitly requested
+            // Use .as_str() to get the actual value (Display is intentionally redacted)
+            text: if include_values {
+                Some(f.matched_text.as_str().to_string())
+            } else {
+                None
+            },
             position: format!("{}..{}", f.start, f.end),
             confidence: f.confidence,
         })
@@ -213,6 +254,7 @@ fn scan_directory(
     policy: &veil_policy::Policy,
     quiet: bool,
     json: bool,
+    include_values: bool,
     results: &mut Vec<ScanResult>,
 ) -> Result<()> {
     for entry in fs::read_dir(dir).into_diagnostic()? {
@@ -220,7 +262,7 @@ fn scan_directory(
         let path = entry.path();
 
         if path.is_dir() {
-            scan_directory(&path, registry, policy, quiet, json, results)?;
+            scan_directory(&path, registry, policy, quiet, json, include_values, results)?;
         } else {
             let ext = path
                 .extension()
@@ -235,7 +277,7 @@ fn scan_directory(
                 || PDF_EXTENSIONS.contains(&ext.as_str());
 
             if supported {
-                match scan_file(&path, registry, policy, quiet) {
+                match scan_file(&path, registry, policy, quiet, include_values) {
                     Ok(result) => results.push(result),
                     Err(e) => {
                         if !quiet && !json {

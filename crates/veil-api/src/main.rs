@@ -43,6 +43,12 @@ async fn main() {
         config.max_body_size
     );
 
+    // Validate authentication configuration
+    if let Err(e) = config.auth.validate() {
+        tracing::error!("Configuration error: {}", e);
+        std::process::exit(1);
+    }
+
     // Run the server
     if let Err(e) = run_server(config).await {
         tracing::error!("Server error: {}", e);

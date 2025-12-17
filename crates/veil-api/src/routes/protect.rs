@@ -3,7 +3,7 @@
 use axum::{
     body::Body,
     extract::{Multipart, Query, State},
-    http::{header, Response, StatusCode},
+    http::{header, HeaderMap, Response, StatusCode},
 };
 use std::time::Instant;
 use uuid::Uuid;
@@ -13,14 +13,39 @@ use crate::models::{Finding, PositionInfo, ProtectOptions, ScanStats};
 use crate::security::{safe_content_disposition, sanitize_filename};
 use crate::AppState;
 
+/// Header name for PII exposure acknowledgment.
+const PII_ACKNOWLEDGE_HEADER: &str = "x-acknowledge-pii-exposure";
+
 /// POST /api/v1/protect - Protect a file by redacting PII.
 pub async fn protect_file(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Query(options): Query<ProtectOptions>,
     mut multipart: Multipart,
 ) -> ApiResult<Response<Body>> {
     let start_time = Instant::now();
     let request_id = Uuid::new_v4().to_string();
+
+    // Validate PII exposure acknowledgment if include_values is requested
+    let include_values = if options.include_values {
+        // Check for acknowledgment header
+        let acknowledged = headers
+            .get(PII_ACKNOWLEDGE_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.eq_ignore_ascii_case("accepted"))
+            .unwrap_or(false);
+
+        if !acknowledged {
+            return Err(ApiError::BadRequest(
+                "The include_values parameter requires explicit acknowledgment. \
+                 Add header 'X-Acknowledge-PII-Exposure: accepted' to confirm you understand \
+                 the security implications of including PII values in the response.".to_string()
+            ));
+        }
+        true
+    } else {
+        false
+    };
 
     // Extract file from multipart
     let (filename, data) = extract_file(&mut multipart, state.config.max_body_size).await?;
@@ -85,6 +110,7 @@ pub async fn protect_file(
     }
 
     // Build findings list if requested
+    // Only include PII values if explicitly requested with acknowledgment header
     let _findings: Vec<Finding> = if options.include_findings {
         filtered_detections
             .iter()
@@ -92,7 +118,12 @@ pub async fn protect_file(
                 let segment = &parse_result.segments[d.segment_index];
                 Finding {
                     category: d.category.as_str().to_string(),
-                    value: d.matched_text.clone(),
+                    // Use .as_str() to get the actual value (Display is intentionally redacted)
+                    value: if include_values {
+                        Some(d.matched_text.as_str().to_string())
+                    } else {
+                        None
+                    },
                     confidence: d.confidence as f64,
                     start: d.start,
                     end: d.end,

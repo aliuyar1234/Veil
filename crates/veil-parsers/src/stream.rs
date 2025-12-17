@@ -56,7 +56,7 @@ impl<R: Read> Iterator for TextStream<R> {
                 let content_len = content.len();
 
                 let segment = TextSegment {
-                    content,
+                    content: content.into(),
                     position: Position::Text {
                         line: self.line_num,
                         column: 1,
@@ -165,7 +165,7 @@ impl<R: Read> Iterator for CsvStream<R> {
         let header = self.headers.get(self.col_idx).cloned();
 
         let segment = TextSegment {
-            content: field.to_string(),
+            content: field.to_string().into(),
             position: Position::Csv {
                 row: self.row_num,
                 column: self.col_idx,
@@ -258,9 +258,9 @@ mod tests {
         let segments: Vec<_> = stream.filter_map(|r| r.ok()).collect();
 
         assert_eq!(segments.len(), 3);
-        assert_eq!(segments[0].content, "Line 1");
-        assert_eq!(segments[1].content, "Line 2");
-        assert_eq!(segments[2].content, "Line 3");
+        assert_eq!(segments[0].content.as_str(), "Line 1");
+        assert_eq!(segments[1].content.as_str(), "Line 2");
+        assert_eq!(segments[2].content.as_str(), "Line 3");
     }
 
     #[test]
@@ -298,10 +298,10 @@ mod tests {
 
         // 2 rows * 2 columns = 4 segments
         assert_eq!(segments.len(), 4);
-        assert_eq!(segments[0].content, "John");
-        assert_eq!(segments[1].content, "john@test.com");
-        assert_eq!(segments[2].content, "Jane");
-        assert_eq!(segments[3].content, "jane@test.com");
+        assert_eq!(segments[0].content.as_str(), "John");
+        assert_eq!(segments[1].content.as_str(), "john@test.com");
+        assert_eq!(segments[2].content.as_str(), "Jane");
+        assert_eq!(segments[3].content.as_str(), "jane@test.com");
     }
 
     #[test]
@@ -367,7 +367,7 @@ mod tests {
         let segments: Vec<_> = stream.filter_map(|r| r.ok()).collect();
 
         assert_eq!(segments.len(), 2);
-        assert_eq!(segments[0].content, "Line 1");
+        assert_eq!(segments[0].content.as_str(), "Line 1");
     }
 
     #[test]
@@ -389,6 +389,6 @@ mod tests {
         let segments: Vec<_> = stream.filter_map(|r| r.ok()).collect();
 
         assert_eq!(segments.len(), 1);
-        assert_eq!(segments[0].content, "Single line");
+        assert_eq!(segments[0].content.as_str(), "Single line");
     }
 }

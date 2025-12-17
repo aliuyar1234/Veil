@@ -177,7 +177,7 @@ fn extract_slide_xml<R: Read + Seek>(
                             total_chars += current_text.len();
 
                             segments.push(TextSegment {
-                                content: current_text.clone(),
+                                content: current_text.clone().into(),
                                 position: Position::Pptx {
                                     slide: slide_num,
                                     element: current_element.as_str().to_string(),
@@ -250,7 +250,7 @@ fn extract_notes_xml<R: Read + Seek>(
                         total_chars += current_text.len();
 
                         segments.push(TextSegment {
-                            content: current_text.clone(),
+                            content: current_text.clone().into(),
                             position: Position::Pptx {
                                 slide: slide_num,
                                 element: PptxElement::Note.as_str().to_string(),

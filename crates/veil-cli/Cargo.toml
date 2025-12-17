@@ -32,6 +32,7 @@ indicatif.workspace = true
 console.workspace = true
 rand.workspace = true
 base64.workspace = true
+atty.workspace = true
 
 [dev-dependencies]
 pretty_assertions.workspace = true

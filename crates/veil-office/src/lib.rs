@@ -25,7 +25,8 @@
 //! let result = parse_docx(file).unwrap();
 //!
 //! for segment in result.segments {
-//!     println!("{:?}: {}", segment.position, segment.content);
+//!     // Use .as_str() for intentional output (content is redacted by default)
+//!     println!("{:?}: {}", segment.position, segment.content.as_str());
 //! }
 //! ```
 //!

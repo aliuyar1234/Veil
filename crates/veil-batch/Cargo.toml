@@ -25,6 +25,9 @@ rayon = { workspace = true }
 # Progress
 indicatif = { workspace = true }
 
+# Logging
+tracing = { workspace = true }
+
 # Veil crates
 veil-parsers = { path = "../veil-parsers" }
 

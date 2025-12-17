@@ -267,8 +267,9 @@ impl Scanner {
 
     /// Convert a Finding to a PIILocation.
     fn finding_to_location(&self, finding: &Finding) -> PIILocation {
+        // Use .as_str() to get the actual value (Display is intentionally redacted)
         let snippet = if self.options.include_snippets {
-            Some(finding.matched_text.clone())
+            Some(finding.matched_text.as_str().to_string())
         } else {
             None
         };

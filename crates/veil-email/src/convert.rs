@@ -25,7 +25,7 @@ impl EmailMessage {
         for attachment in &self.attachments {
             if let Some(filename) = &attachment.filename {
                 segments.push(TextSegment {
-                    content: filename.clone(),
+                    content: filename.clone().into(),
                     position: Position::Email {
                         field: "attachment_filename".to_string(),
                         field_index: None,
@@ -85,7 +85,7 @@ impl EmailHeader {
                 // Add display name if present
                 if let Some(name) = &addr.display_name {
                     segments.push(TextSegment {
-                        content: name.clone(),
+                        content: name.clone().into(),
                         position: Position::Email {
                             field: format!("{}_name", self.name.to_lowercase()),
                             field_index: Some(field_index),
@@ -98,7 +98,7 @@ impl EmailHeader {
 
                 // Add email address
                 segments.push(TextSegment {
-                    content: addr.address.clone(),
+                    content: addr.address.clone().into(),
                     position: Position::Email {
                         field: format!("{}_address", self.name.to_lowercase()),
                         field_index: Some(field_index),
@@ -113,7 +113,7 @@ impl EmailHeader {
                     // Add display name if present
                     if let Some(name) = &addr.display_name {
                         segments.push(TextSegment {
-                            content: name.clone(),
+                            content: name.clone().into(),
                             position: Position::Email {
                                 field: format!("{}_name", self.name.to_lowercase()),
                                 field_index: Some(field_index),
@@ -126,7 +126,7 @@ impl EmailHeader {
 
                     // Add email address
                     segments.push(TextSegment {
-                        content: addr.address.clone(),
+                        content: addr.address.clone().into(),
                         position: Position::Email {
                             field: format!("{}_address", self.name.to_lowercase()),
                             field_index: Some(field_index),
@@ -140,7 +140,7 @@ impl EmailHeader {
             EmailHeaderValue::Text(text) | EmailHeaderValue::Unstructured(text) => {
                 if !text.is_empty() {
                     segments.push(TextSegment {
-                        content: text.clone(),
+                        content: text.clone().into(),
                         position: Position::Email {
                             field: self.name.to_lowercase(),
                             field_index: Some(field_index),
@@ -153,7 +153,7 @@ impl EmailHeader {
             }
             EmailHeaderValue::DateTime(dt) => {
                 segments.push(TextSegment {
-                    content: dt.clone(),
+                    content: dt.clone().into(),
                     position: Position::Email {
                         field: self.name.to_lowercase(),
                         field_index: Some(field_index),
@@ -183,7 +183,7 @@ impl EmailBodyPart {
         };
 
         vec![TextSegment {
-            content: self.content.clone(),
+            content: self.content.clone().into(),
             position: Position::Email {
                 field: field.to_string(),
                 field_index: None,
@@ -213,8 +213,8 @@ mod tests {
 
         let segments = header.to_text_segments(0);
         assert_eq!(segments.len(), 2);
-        assert!(segments.iter().any(|s| s.content == "John Doe"));
-        assert!(segments.iter().any(|s| s.content == "john@example.com"));
+        assert!(segments.iter().any(|s| s.content.as_str() == "John Doe"));
+        assert!(segments.iter().any(|s| s.content.as_str() == "john@example.com"));
     }
 
     #[test]
@@ -227,7 +227,7 @@ mod tests {
 
         let segments = header.to_text_segments(0);
         assert_eq!(segments.len(), 1);
-        assert_eq!(segments[0].content, "Test Subject");
+        assert_eq!(segments[0].content.as_str(), "Test Subject");
     }
 
     #[test]
@@ -236,7 +236,7 @@ mod tests {
         let segments = part.to_text_segments(0);
 
         assert_eq!(segments.len(), 1);
-        assert_eq!(segments[0].content, "Hello world");
+        assert_eq!(segments[0].content.as_str(), "Hello world");
     }
 
     #[test]

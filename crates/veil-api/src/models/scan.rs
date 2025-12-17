@@ -25,6 +25,11 @@ pub struct ScanOptions {
     /// Context characters before/after finding.
     #[serde(default = "default_context_chars")]
     pub context_chars: usize,
+
+    /// Include matched PII values in response (default: false for security).
+    /// Requires X-Acknowledge-PII-Exposure header when true.
+    #[serde(default)]
+    pub include_values: bool,
 }
 
 fn default_context_chars() -> usize {
@@ -38,8 +43,9 @@ pub struct Finding {
     /// PII category (email, phone, credit_card, etc.).
     pub category: String,
 
-    /// The matched text.
-    pub value: String,
+    /// The matched text (only included when include_values=true with acknowledgment).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
 
     /// Start position in the document.
     pub start: usize,

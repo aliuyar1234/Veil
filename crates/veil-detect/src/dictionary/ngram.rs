@@ -11,6 +11,10 @@ const DEFAULT_NGRAM_SIZE: usize = 3;
 /// Minimum candidate overlap ratio for fuzzy matching.
 /// If input shares at least this fraction of n-grams with a term,
 /// it's considered a candidate for full similarity check.
+///
+/// Note: Used by `find_candidates()` which is part of the public API
+/// for advanced fuzzy matching use cases.
+#[allow(dead_code)] // Public API for advanced fuzzy matching - used by find_candidates()
 const MIN_OVERLAP_RATIO: f64 = 0.3;
 
 /// N-gram index for fast fuzzy matching.
@@ -66,6 +70,7 @@ impl NgramIndex {
     ///
     /// Returns indices of terms that share enough n-grams with the query
     /// to be potential fuzzy matches.
+    #[allow(dead_code)] // Public API for advanced fuzzy matching scenarios
     pub fn find_candidates(&self, query: &str) -> Vec<usize> {
         let query_ngrams = Self::compute_ngrams(query, self.ngram_size);
         if query_ngrams.is_empty() {
@@ -146,11 +151,13 @@ impl NgramIndex {
     }
 
     /// Get the number of unique n-grams in the index.
+    #[allow(dead_code)] // Public API for index statistics
     pub fn ngram_count(&self) -> usize {
         self.index.len()
     }
 
     /// Get the number of terms indexed.
+    #[allow(dead_code)] // Public API for index statistics
     pub fn term_count(&self) -> usize {
         self.term_count
     }
@@ -256,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_bigrams() {
-        let index = NgramIndex::with_size(2);
+        let _index = NgramIndex::with_size(2); // Verify construction with custom size
         let ngrams = NgramIndex::compute_ngrams("hello", 2);
 
         assert!(ngrams.contains("he"));

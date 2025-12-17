@@ -9,6 +9,22 @@ use std::sync::Arc;
 use std::time::Instant;
 use veil_parsers::FileFormat;
 
+/// Build a thread pool with the specified number of threads.
+/// Falls back to a single-threaded pool if construction fails.
+fn build_thread_pool(num_threads: usize) -> rayon::ThreadPool {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(num_threads)
+        .build()
+        .unwrap_or_else(|e| {
+            tracing::warn!("Failed to build thread pool with {} threads: {}, using single thread", num_threads, e);
+            // Fallback: try with 1 thread, and if that fails, use the global pool
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(1)
+                .build()
+                .expect("Failed to create even a single-threaded pool - system resource exhaustion")
+        })
+}
+
 /// Thread-local accumulator for batch processing results.
 /// This avoids mutex contention by accumulating results per-thread
 /// and merging at the end.
@@ -65,21 +81,13 @@ pub fn process_files_parallel(
     progress: Option<Arc<ProgressState>>,
 ) -> (Vec<FileResult>, Vec<FileError>, Vec<SkippedFile>) {
     // Configure thread pool
-    let pool = if let Some(parallelism) = options.max_parallelism {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(parallelism)
-            .build()
-            .unwrap_or_else(|_| rayon::ThreadPoolBuilder::new().build().unwrap())
-    } else {
+    let num_threads = options.max_parallelism.unwrap_or_else(|| {
         // Default: use available parallelism - 1
-        let num_threads = std::thread::available_parallelism()
+        std::thread::available_parallelism()
             .map(|n| n.get().saturating_sub(1).max(1))
-            .unwrap_or(1);
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_threads)
-            .build()
-            .unwrap_or_else(|_| rayon::ThreadPoolBuilder::new().build().unwrap())
-    };
+            .unwrap_or(1)
+    });
+    let pool = build_thread_pool(num_threads);
 
     // Use thread-local accumulation with fold/reduce to avoid mutex contention
     let accumulator = pool.install(|| {

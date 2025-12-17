@@ -3,18 +3,22 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
 
+use veil_core::SensitiveString;
+
 use crate::error::VaultError;
 use crate::vault::TokenVault;
 
 /// In-memory token vault for testing and simple use cases.
 ///
 /// Thread-safe implementation using RwLock.
+/// Original values are stored using SensitiveString for secure memory handling.
 #[derive(Debug, Default)]
 pub struct InMemoryVault {
-    /// Token to original mapping.
-    tokens: RwLock<HashMap<String, String>>,
+    /// Token to original mapping (original values use SensitiveString for security).
+    tokens: RwLock<HashMap<String, SensitiveString>>,
     /// Original to token mapping (for consistency lookups).
-    reverse: RwLock<HashMap<String, String>>,
+    /// Keys use SensitiveString to securely store original values.
+    reverse: RwLock<HashMap<SensitiveString, String>>,
 }
 
 impl InMemoryVault {
@@ -62,9 +66,10 @@ impl TokenVault for InMemoryVault {
             return Err(VaultError::Duplicate(token.to_string()));
         }
 
-        // Store both mappings
-        tokens.insert(token.to_string(), original.to_string());
-        reverse.insert(original.to_string(), token.to_string());
+        // Store both mappings using SensitiveString for secure memory handling
+        let sensitive_original = SensitiveString::new(original);
+        tokens.insert(token.to_string(), sensitive_original.clone());
+        reverse.insert(sensitive_original, token.to_string());
 
         Ok(())
     }
@@ -75,7 +80,8 @@ impl TokenVault for InMemoryVault {
             .read()
             .map_err(|e| VaultError::Storage(e.to_string()))?;
 
-        Ok(tokens.get(token).cloned())
+        // Convert SensitiveString back to String for return
+        Ok(tokens.get(token).map(|s| s.as_str().to_string()))
     }
 
     fn delete(&self, token: &str) -> Result<bool, VaultError> {
@@ -104,7 +110,9 @@ impl TokenVault for InMemoryVault {
             .read()
             .map_err(|e| VaultError::Storage(e.to_string()))?;
 
-        Ok(reverse.get(original).cloned())
+        // Create a SensitiveString key for lookup
+        let key = SensitiveString::new(original);
+        Ok(reverse.get(&key).cloned())
     }
 }
 

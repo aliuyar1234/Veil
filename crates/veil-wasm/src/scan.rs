@@ -96,6 +96,20 @@ fn perform_scan(
     format: veil_parsers::FileFormat,
     options: &ScanOptions,
 ) -> Result<Vec<Finding>, WasmError> {
+    // Validate PII exposure acknowledgment if include_values is requested
+    let include_values = if options.include_values {
+        if !options.acknowledge_exposure {
+            return Err(WasmError::invalid_config(
+                "includeValues requires acknowledgeExposure to be true. \
+                 Set {includeValues: true, acknowledgeExposure: true} to confirm \
+                 you understand the security implications of including PII values."
+            ));
+        }
+        true
+    } else {
+        false
+    };
+
     // Parse the document with format set in options
     let parse_options = veil_parsers::ParseOptions {
         format: Some(format),
@@ -134,9 +148,17 @@ fn perform_scan(
         let start = segment_offset + finding.start;
         let end = segment_offset + finding.end;
 
+        // Only include PII value if explicitly requested and acknowledged
+        // Use .as_str() to get the actual value (Display is intentionally redacted)
+        let value = if include_values {
+            Some(finding.matched_text.as_str().to_string())
+        } else {
+            None
+        };
+
         findings.push(Finding::new(
             category_name,
-            finding.matched_text.clone(),
+            value,
             start,
             end,
             confidence,
@@ -175,7 +197,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_scan_text_with_email() {
+    fn test_scan_text_with_email_no_value_by_default() {
         let data = b"Contact us at test@example.com for more info.";
         let options = ScanOptions::default();
 
@@ -183,7 +205,40 @@ mod tests {
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].category, "email");
-        assert_eq!(result[0].value, "test@example.com");
+        // Value should be None by default for security
+        assert_eq!(result[0].value, None);
+    }
+
+    #[test]
+    fn test_scan_with_include_values_and_acknowledgment() {
+        let data = b"Contact us at test@example.com for more info.";
+        let options = ScanOptions {
+            include_values: true,
+            acknowledge_exposure: true,
+            ..Default::default()
+        };
+
+        let result = perform_scan(data, veil_parsers::FileFormat::Text, &options).unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].category, "email");
+        // Value should be included when acknowledged
+        assert_eq!(result[0].value, Some("test@example.com".to_string()));
+    }
+
+    #[test]
+    fn test_scan_with_include_values_without_acknowledgment_fails() {
+        let data = b"Contact us at test@example.com for more info.";
+        let options = ScanOptions {
+            include_values: true,
+            acknowledge_exposure: false,
+            ..Default::default()
+        };
+
+        let result = perform_scan(data, veil_parsers::FileFormat::Text, &options);
+
+        // Should fail without acknowledgment
+        assert!(result.is_err());
     }
 
     #[test]

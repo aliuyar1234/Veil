@@ -116,7 +116,7 @@ fn protect_file(
                     // For CSV/JSON, search for the matched text in content
                     // This is a fallback that may find the wrong occurrence
                     content
-                        .find(&f.matched_text)
+                        .find(f.matched_text.as_str())
                         .map(|pos| veil_detect::Finding {
                             start: pos,
                             end: pos + f.matched_text.len(),

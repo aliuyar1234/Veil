@@ -60,7 +60,7 @@ fn extract_strings(value: &Value, path: &str, results: &mut Vec<TextSegment>) {
     match value {
         Value::String(s) => {
             results.push(TextSegment {
-                content: s.clone(),
+                content: s.clone().into(),
                 position: Position::Json {
                     path: path.to_string(),
                 },
@@ -140,6 +140,6 @@ mod tests {
 
         // Only "John" should be extracted
         assert_eq!(result.segments.len(), 1);
-        assert_eq!(result.segments[0].content, "John");
+        assert_eq!(result.segments[0].content.as_str(), "John");
     }
 }

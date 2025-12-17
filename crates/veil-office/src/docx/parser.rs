@@ -210,7 +210,7 @@ fn extract_document_xml<R: Read + Seek>(
                             };
 
                             segments.push(TextSegment {
-                                content: current_text.clone(),
+                                content: current_text.clone().into(),
                                 position,
                             });
                         }
@@ -275,7 +275,7 @@ fn extract_header_footer_xml<R: Read + Seek>(
                         total_chars += current_text.len();
 
                         segments.push(TextSegment {
-                            content: current_text.clone(),
+                            content: current_text.clone().into(),
                             position: Position::Docx {
                                 section: section.as_str().to_string(),
                                 paragraph: paragraph_num,

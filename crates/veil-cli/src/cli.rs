@@ -64,6 +64,14 @@ pub struct ScanArgs {
     /// Exit with code 2 if findings are detected
     #[arg(long)]
     pub fail_on_findings: bool,
+
+    /// Include matched PII values in output (requires confirmation)
+    #[arg(long)]
+    pub include_values: bool,
+
+    /// Skip confirmation prompt for --include-values (for scripted use)
+    #[arg(short = 'y', long)]
+    pub yes: bool,
 }
 
 /// Arguments for the protect command

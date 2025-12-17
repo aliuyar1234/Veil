@@ -82,7 +82,7 @@ impl CsvParser {
                 let header = headers.get(col_idx).cloned();
 
                 segments.push(TextSegment {
-                    content: field.to_string(),
+                    content: field.to_string().into(),
                     position: Position::Csv {
                         row: row_num,
                         column: col_idx,
@@ -130,8 +130,8 @@ mod tests {
 
         // 2 rows * 2 columns = 4 segments
         assert_eq!(result.segments.len(), 4);
-        assert_eq!(result.segments[0].content, "John");
-        assert_eq!(result.segments[1].content, "john@example.com");
+        assert_eq!(result.segments[0].content.as_str(), "John");
+        assert_eq!(result.segments[1].content.as_str(), "john@example.com");
     }
 
     #[test]
@@ -158,6 +158,6 @@ mod tests {
         let result = parser.parse_bytes(content, &options).unwrap();
 
         assert_eq!(result.segments.len(), 2);
-        assert_eq!(result.segments[0].content, "John");
+        assert_eq!(result.segments[0].content.as_str(), "John");
     }
 }

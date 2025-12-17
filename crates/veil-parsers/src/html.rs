@@ -100,7 +100,7 @@ fn extract_text_from_element(
                 if !content.is_empty() {
                     let len = content.len();
                     segments.push(TextSegment {
-                        content: content.to_string(),
+                        content: content.to_string().into(),
                         position: Position::Html {
                             byte_offset: *byte_offset,
                             byte_length: len,

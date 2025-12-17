@@ -7,6 +7,9 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+# Workspace crates
+veil-core = { path = "../veil-core" }
+
 # Serialization
 serde.workspace = true
 serde_json.workspace = true
