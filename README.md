@@ -4,193 +4,225 @@
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 
-A high-performance, privacy-focused toolkit for detecting and redacting Personally Identifiable Information (PII) in documents. Built in Rust for speed, safety, and cross-platform compatibility.
+**Protect sensitive data automatically.** Veil finds and hides personal information in your documents before it falls into the wrong hands.
 
-## Features
+---
 
-- **Multi-format Support**: Parse and analyze text, CSV, JSON, HTML, PDF, Office documents (XLSX, DOCX), and email files
-- **Smart Detection**: Regex patterns, dictionary matching, and contextual analysis for accurate PII identification
-- **Flexible Redaction**: Multiple strategies including masking, replacement, tokenization, and format-preserving encryption
-- **Policy Engine**: YAML-based rules with GDPR, HIPAA, and PCI-DSS presets
-- **Audit Logging**: Immutable JSONL audit trails with cryptographic verification
-- **Streaming Support**: Process large files with bounded memory usage
-- **Batch Processing**: Parallel processing of entire directories
-- **WASM Support**: Run in browsers with full functionality
-- **REST API**: Production-ready HTTP server for integration
+## What is Veil?
 
-## Quick Start
+Veil is a privacy protection toolkit that automatically detects and removes sensitive personal information from documents. Whether you're handling customer data, employee records, or business documents, Veil helps you stay compliant with privacy regulations like GDPR, HIPAA, and PCI-DSS.
 
-### Installation
+### The Problem
+
+Every day, organizations handle thousands of documents containing sensitive data:
+- Customer emails with phone numbers and addresses
+- Spreadsheets with social security numbers
+- PDFs with credit card information
+- Employee records with personal details
+
+Manually reviewing these documents is slow, expensive, and error-prone. A single data leak can result in massive fines and reputation damage.
+
+### The Solution
+
+Veil automatically scans your documents and:
+- **Finds** personal information (emails, phone numbers, SSNs, credit cards, etc.)
+- **Protects** it by masking, replacing, or encrypting the data
+- **Logs** everything for audit compliance
+
+All of this happens in seconds, not hours.
+
+---
+
+## What Can Veil Detect?
+
+| Category | What It Finds |
+|----------|---------------|
+| **Personal Identity** | Names, Social Security Numbers, Passport Numbers, Driver's License Numbers |
+| **Contact Information** | Email addresses, Phone numbers (US, UK, EU, international), Physical addresses |
+| **Financial Data** | Credit card numbers, Bank accounts, IBANs |
+| **Health Information** | Medical record numbers (HIPAA compliance) |
+| **Technical Data** | IP addresses, MAC addresses |
+
+Veil supports documents in many formats:
+- **Text files** (TXT, CSV, JSON, XML, HTML)
+- **Office documents** (Excel, Word, PowerPoint)
+- **PDFs**
+- **Emails** (EML files)
+
+---
+
+## Key Features
+
+### Enterprise-Grade Security
+
+- **Memory Protection**: Sensitive data is automatically wiped from memory after processing
+- **Encrypted Storage**: Tokenized data is stored securely
+- **Audit Trails**: Every action is logged with tamper-proof verification
+- **Access Control**: API authentication with JWT tokens
+
+### Compliance Ready
+
+Pre-built policies for major regulations:
+- **GDPR** - European data protection
+- **HIPAA** - Healthcare privacy (US)
+- **PCI-DSS** - Payment card security
+
+### Flexible Deployment
+
+- **Command Line** - Process files from your terminal
+- **REST API** - Integrate with your existing systems
+- **Web Browser** - Run directly in the browser (WebAssembly)
+- **Library** - Embed in your own applications
+
+### High Performance
+
+- Process large files without running out of memory
+- Batch process thousands of files in parallel
+- Handle streaming data in real-time
+
+---
+
+## Getting Started
+
+### Option 1: Command Line
 
 ```bash
-# Clone the repository
+# Install Veil
 git clone https://github.com/aliuyar1234/Veil.git
-cd veil
-
-# Build the CLI
+cd Veil
 cargo build --release -p veil-cli
 
-# Install locally
-cargo install --path crates/veil-cli
+# Scan a document for sensitive data
+./target/release/veil scan document.txt
+
+# Protect a document (redact sensitive data)
+./target/release/veil protect document.txt -o safe_document.txt
+
+# Scan an entire folder
+./target/release/veil scan ./documents --recursive
 ```
 
-### Basic Usage
+### Option 2: API Server
 
 ```bash
-# Scan a file for PII
-veil scan document.txt
+# Start the server
+./target/release/veil serve --port 8080
 
-# Redact PII from a file
-veil redact document.txt -o redacted.txt
-
-# Scan with a specific policy
-veil scan document.txt --policy gdpr
-
-# Process a directory
-veil batch ./documents --output ./redacted
-
-# Start the API server
-veil serve --port 8080
+# Send a file for scanning (from another terminal)
+curl -X POST http://localhost:8080/api/v1/scan \
+  -F "file=@document.txt"
 ```
 
-### Library Usage
+### Option 3: Use in Your Code
 
 ```rust
-use veil_detect::{Detector, DetectorConfig};
-use veil_redact::{Redactor, RedactionStrategy};
+use veil_detect::DetectorRegistry;
+use veil_parsers::{parse_str, ParseOptions};
 
-// Create a detector
-let detector = Detector::new(DetectorConfig::default());
+// Parse your document
+let result = parse_str("Contact: john@example.com, SSN: 123-45-6789", &ParseOptions::default())?;
 
-// Detect PII in text
-let text = "Contact John Smith at john@example.com or 555-123-4567";
-let findings = detector.detect(text)?;
+// Find all sensitive data
+let registry = DetectorRegistry::default();
+let findings = registry.detect_all(&result.segments);
 
-// Redact the findings
-let redactor = Redactor::new(RedactionStrategy::Mask { char: '*' });
-let redacted = redactor.redact(text, &findings)?;
-
-println!("{}", redacted);
-// Output: "Contact [REDACTED] at ****@*******.*** or ***-***-****"
+// Each finding tells you what was found and where
+for finding in findings {
+    println!("Found {} at position {}-{}", finding.category, finding.start, finding.end);
+}
 ```
 
-## Architecture
+---
+
+## How It Works
 
 ```
-veil/
-├── veil-parsers    # Document parsing (text, CSV, JSON, HTML, PDF)
-├── veil-detect     # PII detection engine (regex, dictionary, ML-ready)
-├── veil-redact     # Redaction strategies and execution
-├── veil-crypto     # Encryption, tokenization, key management
-├── veil-policy     # Policy engine with YAML rule definitions
-├── veil-audit      # Immutable audit logging with verification
-├── veil-office     # Office document support (XLSX, DOCX)
-├── veil-email      # Email parsing (EML, MIME)
-├── veil-discovery  # File type detection and routing
-├── veil-stream     # Memory-bounded streaming for large files
-├── veil-batch      # Parallel batch processing
-├── veil-api        # REST API server (Axum-based)
-├── veil-cli        # Command-line interface
-└── veil-wasm       # WebAssembly bindings for browsers
+Your Document → Parse → Detect → Protect → Safe Document
+     ↓            ↓        ↓         ↓          ↓
+   PDF/Excel   Extract   Find     Mask or    Output
+   Email/etc   text      PII      encrypt    clean file
 ```
 
-## Supported PII Types
+1. **Parse**: Veil reads your document and extracts the text content
+2. **Detect**: Smart algorithms scan for patterns matching sensitive data
+3. **Protect**: Found data is masked (`***`), replaced (`[EMAIL]`), or encrypted
+4. **Output**: You get a clean document safe for sharing
 
-| Category | Types |
-|----------|-------|
-| Identity | Names, SSN, Passport numbers, Driver's license |
-| Contact | Email, Phone, Address |
-| Financial | Credit card, Bank account, IBAN |
-| Health | Medical record numbers (HIPAA) |
-| Technical | IP addresses, MAC addresses |
-| Custom | Extensible via regex patterns |
+---
 
-## Policies
+## Project Structure
 
-Veil supports YAML-based policies for customizable detection and redaction:
-
-```yaml
-# gdpr.yaml
-name: GDPR Compliance
-version: "1.0"
-
-rules:
-  - name: personal_email
-    pattern: email
-    severity: high
-    action: redact
-
-  - name: phone_number
-    pattern: phone
-    severity: medium
-    action: mask
-
-settings:
-  min_confidence: 0.8
-  include_context: true
+```
+Veil/
+├── veil-core        # Secure data types (memory protection)
+├── veil-parsers     # Document reading (PDF, Excel, Email, etc.)
+├── veil-detect      # PII detection engine
+├── veil-redact      # Data masking and replacement
+├── veil-crypto      # Encryption and tokenization
+├── veil-policy      # Compliance rules (GDPR, HIPAA, PCI-DSS)
+├── veil-audit       # Tamper-proof logging
+├── veil-api         # REST API server
+├── veil-cli         # Command line tool
+└── veil-wasm        # Browser support
 ```
 
-## Benchmarks
+---
 
-| Operation | Throughput | Memory |
-|-----------|------------|--------|
-| Text detection | ~50 MB/s | O(1) |
-| PDF parsing | ~10 MB/s | O(n) |
-| Batch (10K files) | <10 min | ~100 MB |
-| WASM detection | ~20 MB/s | ~50 MB |
+## Security Features
 
-## Development
+Veil was built with security as a priority:
+
+| Feature | What It Does |
+|---------|--------------|
+| **Memory Zeroization** | Sensitive data is wiped from memory immediately after use |
+| **Secure Display** | PII is hidden in logs and error messages by default |
+| **Request Validation** | API requires explicit acknowledgment to return sensitive data |
+| **JWT Authentication** | API access is protected with industry-standard tokens |
+| **Rate Limiting** | Protection against abuse and denial-of-service |
+| **Audit Logging** | Complete trail of all operations with integrity verification |
+
+---
+
+## For Developers
+
+### Requirements
+
+- Rust 1.75 or newer
+- Cargo (comes with Rust)
+
+### Building
+
+```bash
+# Build everything
+cargo build --workspace
+
+# Run tests (560+ tests)
+cargo test --workspace
+
+# Check code quality
+cargo clippy --workspace -- -D warnings
+```
+
+### Testing
 
 ```bash
 # Run all tests
 cargo test --workspace
 
-# Run with coverage
-cargo tarpaulin --workspace
-
-# Check formatting
-cargo fmt --all -- --check
-
-# Run linter
-cargo clippy --workspace -- -D warnings
-
-# Build documentation
-cargo doc --workspace --no-deps --open
-
-# Build WASM
-wasm-pack build crates/veil-wasm --target web
+# Run specific crate tests
+cargo test -p veil-detect
+cargo test -p veil-api
 ```
 
-## Security
-
-- **No unsafe code** without explicit justification and audit
-- **Constant-time comparisons** for cryptographic operations
-- **Zeroization** of sensitive data in memory
-- **Audit trail integrity** via HMAC verification
-- **Dependency auditing** via `cargo-audit`
-
-Report security vulnerabilities via GitHub Issues.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open a Pull Request
-
-Please ensure tests pass before submitting PRs.
+---
 
 ## License
 
 MIT OR Apache-2.0
 
-## Acknowledgments
+---
 
-Built with these excellent crates:
-- [regex](https://crates.io/crates/regex) - Fast regex matching
-- [scraper](https://crates.io/crates/scraper) - HTML parsing
-- [calamine](https://crates.io/crates/calamine) - Excel parsing
-- [mailparse](https://crates.io/crates/mailparse) - Email parsing
-- [axum](https://crates.io/crates/axum) - Web framework
-- [wasm-bindgen](https://crates.io/crates/wasm-bindgen) - WASM bindings
+## Questions?
+
+- Open an issue on [GitHub](https://github.com/aliuyar1234/Veil/issues)
+- Check the [CHANGELOG](CHANGELOG.md) for recent updates
