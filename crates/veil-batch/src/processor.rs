@@ -8,7 +8,7 @@ use crate::parallel::process_files_parallel;
 use crate::progress::ProgressTracker;
 use crate::streaming::process_streaming;
 use crate::types::{
-    BatchJob, BatchProgress, BatchResult as BatchResultType, BatchSummary, FileEntry,
+    BatchJob, BatchProgress, BatchResult as BatchResultType, BatchSummary, FileEntry, FileError,
 };
 use std::sync::Arc;
 use std::time::Instant;
@@ -64,18 +64,29 @@ impl DefaultBatchProcessor {
     }
 
     /// Discover and filter files for processing.
-    fn discover_and_filter(&self, job: &BatchJob) -> BatchResult<Vec<FileEntry>> {
+    /// Returns (file_entries, archive_errors) tuple.
+    fn discover_and_filter(
+        &self,
+        job: &BatchJob,
+    ) -> BatchResult<(Vec<FileEntry>, Vec<FileError>)> {
         // Discover all files
         let mut entries = discover_files(&job.sources, &job.options)?;
 
-        // Process archives if any
+        // Process archives if any, tracking failures
         let mut archive_entries = Vec::new();
+        let mut archive_errors = Vec::new();
         for entry in &entries {
             if archive::is_zip_archive(&entry.path) {
                 match archive::process_archive(&entry.path, &job.options, 0) {
                     Ok(mut ae) => archive_entries.append(&mut ae),
                     Err(e) => {
-                        eprintln!("Warning: Failed to process archive {:?}: {}", entry.path, e);
+                        tracing::warn!("Failed to process archive {:?}: {}", entry.path, e);
+                        archive_errors.push(FileError {
+                            path: entry.path.clone(),
+                            error: format!("Archive processing failed: {}", e),
+                            from_archive: false,
+                            archive_path: None,
+                        });
                     }
                 }
             }
@@ -86,10 +97,11 @@ impl DefaultBatchProcessor {
         entries.retain(|entry| is_supported_format(entry.format));
 
         // Apply glob filters
-        let filter = GlobFilter::new(&job.options.include_patterns, &job.options.exclude_patterns)?;
+        let filter =
+            GlobFilter::new(&job.options.include_patterns, &job.options.exclude_patterns)?;
         let filtered = apply_filter(entries, &filter, |e| &e.path);
 
-        Ok(filtered)
+        Ok((filtered, archive_errors))
     }
 }
 
@@ -98,10 +110,13 @@ impl BatchProcessor for DefaultBatchProcessor {
         let start_time = Instant::now();
 
         // Discover and filter files
-        let files = self.discover_and_filter(job)?;
+        let (files, archive_errors) = self.discover_and_filter(job)?;
 
         // Process files in parallel
-        let (results, errors, skipped) = process_files_parallel(files, &job.options, None);
+        let (results, mut errors, skipped) = process_files_parallel(files, &job.options, None);
+
+        // Include archive errors in the error list
+        errors.extend(archive_errors);
 
         let duration = start_time.elapsed();
         let result = BatchResultType::new(job.id, results, errors, skipped, duration);
@@ -120,7 +135,7 @@ impl BatchProcessor for DefaultBatchProcessor {
         let start_time = Instant::now();
 
         // Discover and filter files
-        let files = self.discover_and_filter(job)?;
+        let (files, archive_errors) = self.discover_and_filter(job)?;
 
         // Create progress tracker
         let tracker = ProgressTracker::new(files.len());
@@ -142,11 +157,16 @@ impl BatchProcessor for DefaultBatchProcessor {
         });
 
         // Process files in parallel
-        let (results, errors, skipped) =
+        let (results, mut errors, skipped) =
             process_files_parallel(files, &job.options, Some(progress_state));
 
-        // Wait for progress thread to finish
-        progress_handle.join().unwrap();
+        // Include archive errors in the error list
+        errors.extend(archive_errors);
+
+        // Wait for progress thread to finish - log warning if it panicked but continue
+        if let Err(e) = progress_handle.join() {
+            tracing::warn!("Progress reporting thread panicked: {:?}", e);
+        }
 
         let duration = start_time.elapsed();
         let result = BatchResultType::new(job.id, results, errors, skipped, duration);
@@ -159,10 +179,21 @@ impl BatchProcessor for DefaultBatchProcessor {
         F: Fn(crate::types::FileResult) + Send + Sync + 'static,
     {
         // Discover and filter files
-        let files = self.discover_and_filter(job)?;
+        let (files, archive_errors) = self.discover_and_filter(job)?;
 
-        // Process with streaming
-        process_streaming(job.id, files, &job.options, None, result_callback)
+        // Log archive errors (streaming mode doesn't collect errors, just counts)
+        for err in &archive_errors {
+            tracing::warn!("Archive error: {} - {}", err.path.display(), err.error);
+        }
+
+        // Process with streaming - note: archive errors are logged but not included in summary
+        // as streaming mode uses a different summary structure
+        let mut summary = process_streaming(job.id, files, &job.options, None, result_callback)?;
+
+        // Add archive failures to the failed count
+        summary.failed += archive_errors.len();
+
+        Ok(summary)
     }
 }
 

@@ -88,46 +88,87 @@ impl DetectorRegistry {
         self.context_analyzer.is_some()
     }
 
-    /// Detect PII in all segments.
+    /// Detect PII in all segments (sequential).
     pub fn detect_all(&self, segments: &[TextSegment]) -> Vec<Finding> {
+        self.detect_all_sequential(segments)
+    }
+
+    /// Detect PII in all segments sequentially.
+    fn detect_all_sequential(&self, segments: &[TextSegment]) -> Vec<Finding> {
         let mut findings = Vec::new();
 
         for (segment_index, segment) in segments.iter().enumerate() {
-            for detector in self.detectors.values() {
-                if !self.enabled.contains(detector.name()) {
-                    continue;
-                }
-
-                let matches = detector.detect(&segment.content);
-                for m in matches {
-                    let validation = detector.validate(&m.text);
-                    let confidence = match &validation {
-                        ValidationStatus::Valid => detector.base_confidence(),
-                        ValidationStatus::Invalid { .. } => detector.base_confidence() * 0.3,
-                        ValidationStatus::Unvalidated => detector.base_confidence() * 0.8,
-                    };
-
-                    findings.push(Finding::new(
-                        m.text,
-                        detector.category(),
-                        m.start,
-                        m.end,
-                        confidence,
-                        validation,
-                        segment_index,
-                    ));
-                }
-            }
+            self.detect_in_segment(segment_index, segment, &mut findings);
         }
 
-        // Sort by position
+        self.sort_findings(&mut findings);
+        findings
+    }
+
+    /// Detect PII in all segments in parallel using rayon.
+    ///
+    /// This is more efficient for large documents with many segments.
+    /// For small documents, sequential detection may be faster due to
+    /// reduced overhead.
+    #[cfg(feature = "parallel")]
+    pub fn detect_all_parallel(&self, segments: &[TextSegment]) -> Vec<Finding> {
+        use rayon::prelude::*;
+
+        let mut findings: Vec<Finding> = segments
+            .par_iter()
+            .enumerate()
+            .flat_map(|(segment_index, segment)| {
+                let mut segment_findings = Vec::new();
+                self.detect_in_segment(segment_index, segment, &mut segment_findings);
+                segment_findings
+            })
+            .collect();
+
+        self.sort_findings(&mut findings);
+        findings
+    }
+
+    /// Detect PII in a single segment.
+    fn detect_in_segment(
+        &self,
+        segment_index: usize,
+        segment: &TextSegment,
+        findings: &mut Vec<Finding>,
+    ) {
+        for detector in self.detectors.values() {
+            if !self.enabled.contains(detector.name()) {
+                continue;
+            }
+
+            let matches = detector.detect(&segment.content);
+            for m in matches {
+                let validation = detector.validate(&m.text);
+                let confidence = match &validation {
+                    ValidationStatus::Valid => detector.base_confidence(),
+                    ValidationStatus::Invalid { .. } => detector.base_confidence() * 0.3,
+                    ValidationStatus::Unvalidated => detector.base_confidence() * 0.8,
+                };
+
+                findings.push(Finding::new(
+                    m.text,
+                    detector.category(),
+                    m.start,
+                    m.end,
+                    confidence,
+                    validation,
+                    segment_index,
+                ));
+            }
+        }
+    }
+
+    /// Sort findings by position.
+    fn sort_findings(&self, findings: &mut [Finding]) {
         findings.sort_by(|a, b| {
             a.segment_index
                 .cmp(&b.segment_index)
                 .then(a.start.cmp(&b.start))
         });
-
-        findings
     }
 
     /// Detect PII in all segments with context analysis.
@@ -163,7 +204,8 @@ impl DetectorRegistry {
                     indices.iter().map(|&i| &findings[i]).collect();
 
                 // Analyze findings with context (accepts &[&Finding] via coercion)
-                let analyses = analyzer.analyze_findings_refs(&segment_findings, &segment.content, language);
+                let analyses =
+                    analyzer.analyze_findings_refs(&segment_findings, &segment.content, language);
 
                 // Update findings with context adjustments
                 for (idx, analysis) in indices.iter().zip(analyses.iter()) {
@@ -240,5 +282,38 @@ mod tests {
         let findings = registry.detect_all(&segments);
 
         assert!(findings.len() >= 2);
+    }
+
+    #[test]
+    #[cfg(feature = "parallel")]
+    fn test_detect_parallel() {
+        let registry = DetectorRegistry::default();
+        let segments = vec![
+            make_segment("Email: john@example.com"),
+            make_segment("Phone: +49 123 456789"),
+            make_segment("IBAN: DE89370400440532013000"),
+        ];
+
+        let sequential = registry.detect_all(&segments);
+        let parallel = registry.detect_all_parallel(&segments);
+
+        // Both should find the same findings (order may differ)
+        assert_eq!(sequential.len(), parallel.len());
+    }
+
+    #[test]
+    #[cfg(feature = "parallel")]
+    fn test_parallel_large_document() {
+        let registry = DetectorRegistry::default();
+
+        // Create a large document with many segments
+        let segments: Vec<TextSegment> = (0..100)
+            .map(|i| make_segment(&format!("Segment {} - email: user{}@example.com", i, i)))
+            .collect();
+
+        let findings = registry.detect_all_parallel(&segments);
+
+        // Should find an email in each segment
+        assert_eq!(findings.len(), 100);
     }
 }

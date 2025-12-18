@@ -12,19 +12,33 @@ use uuid::Uuid;
 use veil_parsers::FileFormat;
 
 /// Build a thread pool with the specified number of threads.
-/// Falls back to a single-threaded pool if construction fails.
-fn build_thread_pool(num_threads: usize) -> rayon::ThreadPool {
-    rayon::ThreadPoolBuilder::new()
+/// Falls back to a single-threaded pool, then to the global pool if construction fails.
+fn build_thread_pool(num_threads: usize) -> Option<rayon::ThreadPool> {
+    match rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .build()
-        .unwrap_or_else(|e| {
-            tracing::warn!("Failed to build thread pool with {} threads: {}, using single thread", num_threads, e);
-            // Fallback: try with 1 thread, and if that fails, use the global pool
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(1)
-                .build()
-                .expect("Failed to create even a single-threaded pool - system resource exhaustion")
-        })
+    {
+        Ok(pool) => Some(pool),
+        Err(e) => {
+            tracing::warn!(
+                "Failed to build thread pool with {} threads: {}, trying single thread",
+                num_threads,
+                e
+            );
+            // Fallback: try with 1 thread
+            match rayon::ThreadPoolBuilder::new().num_threads(1).build() {
+                Ok(pool) => Some(pool),
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to create single-threaded pool: {}, using global pool",
+                        e
+                    );
+                    // Return None to signal use of global pool
+                    None
+                }
+            }
+        }
+    }
 }
 
 /// Safely lock a mutex, recovering from poisoning by returning the inner data.
@@ -95,8 +109,8 @@ where
         }
     });
 
-    // Process files in parallel
-    pool.install(|| {
+    // Process files in parallel - use custom pool if available, otherwise global pool
+    let process_fn = || {
         files.par_iter().for_each(|entry| {
             // Update progress
             if let Some(ref prog) = progress {
@@ -131,7 +145,13 @@ where
                 }
             }
         });
-    });
+    };
+
+    // Execute in custom pool if available, otherwise use global pool
+    match pool {
+        Some(p) => p.install(process_fn),
+        None => process_fn(),
+    };
 
     // Close channel and wait for receiver
     drop(tx);

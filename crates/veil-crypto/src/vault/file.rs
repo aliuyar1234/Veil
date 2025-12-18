@@ -42,8 +42,9 @@ impl FileVault {
         // Create parent directory if needed
         if let Some(parent) = path.parent() {
             if !parent.exists() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| VaultError::Storage(format!("Failed to create directory: {}", e)))?;
+                fs::create_dir_all(parent).map_err(|e| {
+                    VaultError::Storage(format!("Failed to create directory: {}", e))
+                })?;
             }
         }
 
@@ -80,7 +81,8 @@ impl FileVault {
             .map_err(|e| VaultError::Storage(e.to_string()))?;
 
         for line in reader.lines() {
-            let line = line.map_err(|e| VaultError::Storage(format!("Failed to read line: {}", e)))?;
+            let line =
+                line.map_err(|e| VaultError::Storage(format!("Failed to read line: {}", e)))?;
             if line.trim().is_empty() {
                 continue;
             }
@@ -372,7 +374,11 @@ mod tests {
     #[test]
     fn test_creates_parent_directory() {
         let temp_dir = TempDir::new().unwrap();
-        let nested_path = temp_dir.path().join("nested").join("dir").join("tokens.jsonl");
+        let nested_path = temp_dir
+            .path()
+            .join("nested")
+            .join("dir")
+            .join("tokens.jsonl");
 
         let vault = FileVault::new(&nested_path).unwrap();
         vault.store("tok", "val").unwrap();
@@ -389,7 +395,9 @@ mod tests {
         {
             let vault = FileVault::new(&vault_path).unwrap();
             for i in 0..10 {
-                vault.store(&format!("tok_{}", i), &format!("val_{}", i)).unwrap();
+                vault
+                    .store(&format!("tok_{}", i), &format!("val_{}", i))
+                    .unwrap();
             }
         }
 

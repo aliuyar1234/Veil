@@ -23,6 +23,19 @@ strsim.workspace = true
 unicode-segmentation.workspace = true
 unicode-normalization.workspace = true
 
+# Performance optimization
+memchr.workspace = true
+rayon = { workspace = true, optional = true }
+
+[features]
+default = ["parallel"]
+parallel = ["dep:rayon"]
+
 [dev-dependencies]
 pretty_assertions.workspace = true
-proptest = "1.4"
+proptest.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "detection"
+harness = false

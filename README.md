@@ -58,7 +58,6 @@ Veil supports documents in many formats:
 - **Memory Protection**: Sensitive data is automatically wiped from memory after processing
 - **Encrypted Storage**: Tokenized data is stored securely
 - **Audit Trails**: Every action is logged with tamper-proof verification
-- **Access Control**: API authentication with JWT tokens
 
 ### Compliance Ready
 
@@ -70,9 +69,8 @@ Pre-built policies for major regulations:
 ### Flexible Deployment
 
 - **Command Line** - Process files from your terminal
-- **REST API** - Integrate with your existing systems
 - **Web Browser** - Run directly in the browser (WebAssembly)
-- **Library** - Embed in your own applications
+- **Library** - Embed in your own Rust applications
 
 ### High Performance
 
@@ -102,18 +100,7 @@ cargo build --release -p veil-cli
 ./target/release/veil scan ./documents --recursive
 ```
 
-### Option 2: API Server
-
-```bash
-# Start the server
-./target/release/veil serve --port 8080
-
-# Send a file for scanning (from another terminal)
-curl -X POST http://localhost:8080/api/v1/scan \
-  -F "file=@document.txt"
-```
-
-### Option 3: Use in Your Code
+### Option 2: Use in Your Code
 
 ```rust
 use veil_detect::DetectorRegistry;
@@ -154,16 +141,20 @@ Your Document → Parse → Detect → Protect → Safe Document
 
 ```
 Veil/
-├── veil-core        # Secure data types (memory protection)
-├── veil-parsers     # Document reading (PDF, Excel, Email, etc.)
-├── veil-detect      # PII detection engine
+├── veil-core        # Secure data types (memory protection, constants)
+├── veil-parsers     # Document reading (TXT, CSV, JSON, HTML, PDF)
+├── veil-detect      # PII detection engine (patterns, validators)
 ├── veil-redact      # Data masking and replacement
-├── veil-crypto      # Encryption and tokenization
+├── veil-crypto      # Encryption, hashing, and tokenization
 ├── veil-policy      # Compliance rules (GDPR, HIPAA, PCI-DSS)
-├── veil-audit       # Tamper-proof logging
-├── veil-api         # REST API server
+├── veil-audit       # Tamper-proof logging (encrypted, chained)
+├── veil-batch       # Parallel file processing
+├── veil-stream      # Streaming detection for large files
+├── veil-discovery   # File discovery and scanning
+├── veil-office      # Office documents (DOCX, XLSX, PPTX)
+├── veil-email       # Email parsing (EML, MSG)
 ├── veil-cli         # Command line tool
-└── veil-wasm        # Browser support
+└── veil-wasm        # Browser support (WebAssembly)
 ```
 
 ---
@@ -175,11 +166,14 @@ Veil was built with security as a priority:
 | Feature | What It Does |
 |---------|--------------|
 | **Memory Zeroization** | Sensitive data is wiped from memory immediately after use |
+| **Constant-Time Comparison** | Prevents timing attacks when comparing sensitive strings |
 | **Secure Display** | PII is hidden in logs and error messages by default |
-| **Request Validation** | API requires explicit acknowledgment to return sensitive data |
-| **JWT Authentication** | API access is protected with industry-standard tokens |
-| **Rate Limiting** | Protection against abuse and denial-of-service |
+| **No Panics on User Input** | Graceful error handling - no crashes from malformed data |
+| **Path Traversal Protection** | ZIP archives are validated against directory traversal attacks |
+| **ZIP Bomb Protection** | Limits compression ratios and total size to prevent DoS |
 | **Audit Logging** | Complete trail of all operations with integrity verification |
+| **No Network Access** | Runs entirely locally - no data leaves your machine |
+| **No Unsafe Code** | Zero `unsafe` blocks in production code |
 
 ---
 
@@ -196,11 +190,14 @@ Veil was built with security as a priority:
 # Build everything
 cargo build --workspace
 
-# Run tests (560+ tests)
+# Run tests (560+ tests including property-based tests)
 cargo test --workspace
 
 # Check code quality
 cargo clippy --workspace -- -D warnings
+
+# Format code
+cargo fmt --all
 ```
 
 ### Testing
@@ -211,8 +208,19 @@ cargo test --workspace
 
 # Run specific crate tests
 cargo test -p veil-detect
-cargo test -p veil-api
+cargo test -p veil-parsers
+
+# Run with all features
+cargo test --workspace --all-features
 ```
+
+### Test Coverage
+
+The codebase includes:
+- **Unit tests** for all core functionality
+- **Property-based tests** (proptest) for validators and parsers
+- **Integration tests** for end-to-end workflows
+- **Fuzz targets** for security-critical parsers
 
 ---
 

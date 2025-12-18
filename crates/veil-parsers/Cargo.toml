@@ -7,6 +7,10 @@ description = "Document parsing library for PII detection - supports text, CSV, 
 keywords = ["parser", "pii", "privacy", "text-extraction"]
 categories = ["parsing", "text-processing"]
 
+[features]
+default = ["pdf"]
+pdf = ["dep:pdf-extract"]
+
 [dependencies]
 veil-core = { path = "../veil-core" }
 serde.workspace = true
@@ -16,11 +20,17 @@ csv.workspace = true
 encoding_rs.workspace = true
 scraper.workspace = true
 
-# PDF parsing
-pdf-extract.workspace = true
+# PDF parsing (optional)
+pdf-extract = { workspace = true, optional = true }
 
 [dev-dependencies]
 pretty_assertions.workspace = true
 tempfile.workspace = true
 lopdf.workspace = true
 veil-detect = { path = "../veil-detect" }
+proptest.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "parsing"
+harness = false

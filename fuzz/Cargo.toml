@@ -1,0 +1,51 @@
+[package]
+name = "veil-fuzz"
+version = "0.0.0"
+authors = ["Veil Contributors"]
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+# Fuzz targets
+veil-parsers = { path = "../crates/veil-parsers" }
+veil-policy = { path = "../crates/veil-policy" }
+
+# Additional dependencies for fuzz targets
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
+
+# Note: Fuzzing PDF, Email, and Office parsers requires those crates
+# to be built. They are part of the workspace.
+
+[[bin]]
+name = "pdf_parser"
+path = "fuzz_targets/pdf_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "email_parser"
+path = "fuzz_targets/email_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "office_parser"
+path = "fuzz_targets/office_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "policy_yaml"
+path = "fuzz_targets/policy_yaml.rs"
+test = false
+doc = false
+bench = false

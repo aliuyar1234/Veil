@@ -226,12 +226,14 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let mut logger = AuditLogger::new(temp_dir.path()).unwrap();
 
-        let entry1 =
-            AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default());
+        let entry1 = AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default());
         logger.log(entry1).unwrap();
 
-        let entry2 =
-            AuditEntry::new(AuditOperation::Protect, Default::default(), Default::default());
+        let entry2 = AuditEntry::new(
+            AuditOperation::Protect,
+            Default::default(),
+            Default::default(),
+        );
         logger.log(entry2).unwrap();
 
         let entries = logger.query(&AuditFilter::default()).unwrap();
@@ -240,7 +242,10 @@ mod tests {
         // First entry should have no previous checksum
         assert!(entries[0].previous_checksum.is_none());
         // Second entry should have first entry's checksum as previous
-        assert_eq!(entries[1].previous_checksum, Some(entries[0].checksum.clone()));
+        assert_eq!(
+            entries[1].previous_checksum,
+            Some(entries[0].checksum.clone())
+        );
     }
 
     #[test]
@@ -302,8 +307,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let mut logger = AuditLogger::new(temp_dir.path()).unwrap();
 
-        let entry =
-            AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default());
+        let entry = AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default());
         logger.log(entry).unwrap();
 
         // Check that a .jsonl file was created

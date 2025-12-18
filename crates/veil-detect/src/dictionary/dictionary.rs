@@ -157,13 +157,17 @@ impl Dictionary {
 
         // Use n-gram index to find candidates (much faster for large dictionaries)
         // Use a lower overlap threshold for candidate selection since we'll filter by similarity
-        let candidates = self.ngram_index.find_candidates_with_threshold(&normalized_input, 0.2);
+        let candidates = self
+            .ngram_index
+            .find_candidates_with_threshold(&normalized_input, 0.2);
 
         // For very short inputs or if ngram index returns no results, fall back to full scan
         // This ensures we don't miss matches for edge cases
         if candidates.is_empty() && normalized_input.len() >= 3 {
             // Try with even lower threshold
-            let candidates = self.ngram_index.find_candidates_with_threshold(&normalized_input, 0.1);
+            let candidates = self
+                .ngram_index
+                .find_candidates_with_threshold(&normalized_input, 0.1);
             if candidates.is_empty() {
                 // Fall back to full scan for very short queries
                 return self.find_fuzzy_full_scan(term, threshold);

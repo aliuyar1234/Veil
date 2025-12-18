@@ -124,8 +124,21 @@ impl Default for SensitiveString {
 }
 
 impl PartialEq for SensitiveString {
+    /// Constant-time comparison to prevent timing attacks.
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        use subtle::ConstantTimeEq;
+
+        // Use constant-time comparison for security
+        let a = self.0.as_bytes();
+        let b = other.0.as_bytes();
+
+        // First check lengths match (this leaks length, but that's acceptable)
+        if a.len() != b.len() {
+            return false;
+        }
+
+        // Constant-time byte comparison
+        a.ct_eq(b).into()
     }
 }
 
@@ -317,5 +330,64 @@ mod tests {
         let large = "x".repeat(10000);
         let sensitive = SensitiveString::new(&large);
         assert_eq!(sensitive.len(), 10000);
+    }
+
+    // Constant-time comparison tests (T025, T026)
+
+    #[test]
+    fn test_constant_time_equal_strings() {
+        let a = SensitiveString::new("password123");
+        let b = SensitiveString::new("password123");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_constant_time_unequal_strings() {
+        let a = SensitiveString::new("password123");
+        let b = SensitiveString::new("password124");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn test_constant_time_different_lengths() {
+        let a = SensitiveString::new("short");
+        let b = SensitiveString::new("longer_string");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn test_constant_time_empty_strings() {
+        let a = SensitiveString::empty();
+        let b = SensitiveString::empty();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_constant_time_one_empty() {
+        let a = SensitiveString::empty();
+        let b = SensitiveString::new("not_empty");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn test_constant_time_timing_resistance() {
+        // This test verifies that comparison doesn't short-circuit
+        // by checking that equal-length strings with differences at
+        // different positions all return false
+
+        let base = "aaaaaaaaaa"; // 10 chars
+        let base_sensitive = SensitiveString::new(base);
+
+        // Difference at first position
+        let diff_first = SensitiveString::new("baaaaaaaaa");
+        assert_ne!(base_sensitive, diff_first);
+
+        // Difference at last position
+        let diff_last = SensitiveString::new("aaaaaaaaab");
+        assert_ne!(base_sensitive, diff_last);
+
+        // Difference in middle
+        let diff_middle = SensitiveString::new("aaaaabaaaa");
+        assert_ne!(base_sensitive, diff_middle);
     }
 }

@@ -24,4 +24,13 @@ pub enum AuditError {
     /// Log directory not found.
     #[error("Log directory not found: {0}")]
     DirectoryNotFound(String),
+
+    /// Invalid encryption key.
+    #[error("Invalid encryption key: expected {expected} bytes, got {actual} bytes")]
+    InvalidKey {
+        /// Expected key length.
+        expected: usize,
+        /// Actual key length provided.
+        actual: usize,
+    },
 }

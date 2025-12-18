@@ -12,7 +12,10 @@ use proptest::prelude::*;
 fn validate_luhn(number: &str) -> bool {
     // Credit card numbers can only contain digits, spaces, and hyphens
     // Any alphabetic or other characters make it invalid
-    if number.chars().any(|c| !c.is_ascii_digit() && c != ' ' && c != '-') {
+    if number
+        .chars()
+        .any(|c| !c.is_ascii_digit() && c != ' ' && c != '-')
+    {
         return false;
     }
 
@@ -327,8 +330,15 @@ fn test_generate_luhn_number() {
     // Test that our generator creates valid Luhn numbers
     let partial = vec![4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
     let valid = generate_luhn_number(&partial);
-    let number: String = valid.iter().map(|d| char::from_digit(*d, 10).unwrap()).collect();
-    assert!(validate_luhn(&number), "Generated number should be valid: {}", number);
+    let number: String = valid
+        .iter()
+        .map(|d| char::from_digit(*d, 10).unwrap())
+        .collect();
+    assert!(
+        validate_luhn(&number),
+        "Generated number should be valid: {}",
+        number
+    );
 }
 
 #[test]

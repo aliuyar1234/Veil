@@ -5,6 +5,8 @@
 
 use std::io::{BufRead, BufReader, Read};
 
+use veil_core::HEADER_BUFFER_SIZE;
+
 use crate::error::ParseError;
 use crate::types::{FileFormat, ParseOptions, Position, TextSegment};
 
@@ -190,7 +192,11 @@ impl<R: Read> ParseStream<R> {
     /// Create a streaming parser for the given format.
     ///
     /// Returns `None` if the format doesn't support streaming.
-    pub fn new(reader: R, format: FileFormat, options: &ParseOptions) -> Result<Option<Self>, ParseError> {
+    pub fn new(
+        reader: R,
+        format: FileFormat,
+        options: &ParseOptions,
+    ) -> Result<Option<Self>, ParseError> {
         match format {
             FileFormat::Text => Ok(Some(Self::Text(TextStream::new(reader, options)))),
             FileFormat::Csv => Ok(Some(Self::Csv(CsvStream::new(reader, options)?))),
@@ -218,7 +224,7 @@ impl<R: Read> Iterator for ParseStream<R> {
 
 /// Create a streaming parser from a reader with format detection.
 ///
-/// Reads the first 1KB to detect format, then returns a streaming iterator.
+/// Reads the first bytes to detect format, then returns a streaming iterator.
 /// Returns `None` if the format doesn't support streaming.
 pub fn stream_reader<R: Read>(
     mut reader: R,
@@ -226,8 +232,8 @@ pub fn stream_reader<R: Read>(
 ) -> Result<Option<ParseStream<impl Read>>, ParseError> {
     use std::io::Cursor;
 
-    // Read first 1KB for format detection
-    let mut header = vec![0u8; 1024];
+    // Read first bytes for format detection
+    let mut header = vec![0u8; HEADER_BUFFER_SIZE];
     let n = reader.read(&mut header)?;
     header.truncate(n);
 

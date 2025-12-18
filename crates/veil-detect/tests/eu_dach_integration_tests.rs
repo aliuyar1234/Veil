@@ -126,7 +126,11 @@ fn test_swiss_ahv_in_insurance_form() {
         .filter(|f| f.category == PiiCategory::AhvCh)
         .collect();
 
-    assert_eq!(ahv_numbers.len(), 1, "Should find exactly one Swiss AHV number");
+    assert_eq!(
+        ahv_numbers.len(),
+        1,
+        "Should find exactly one Swiss AHV number"
+    );
     assert_eq!(ahv_numbers[0].matched_text.as_str(), "756.1234.5678.97");
 }
 
@@ -148,7 +152,11 @@ fn test_swiss_ahv_different_formats() {
         .filter(|f| f.category == PiiCategory::AhvCh)
         .collect();
 
-    assert_eq!(ahv_numbers.len(), 3, "Should find all three AHV format variants");
+    assert_eq!(
+        ahv_numbers.len(),
+        3,
+        "Should find all three AHV format variants"
+    );
 }
 
 #[test]
@@ -357,12 +365,30 @@ fn test_multiple_eu_vat_numbers_in_partner_list() {
     assert_eq!(vat_numbers.len(), 5, "Should find all 5 EU VAT numbers");
 
     // Verify each country is detected
-    let vat_texts: Vec<&str> = vat_numbers.iter().map(|f| f.matched_text.as_str()).collect();
-    assert!(vat_texts.iter().any(|v| v.starts_with("DE")), "Should find DE VAT");
-    assert!(vat_texts.iter().any(|v| v.starts_with("FR")), "Should find FR VAT");
-    assert!(vat_texts.iter().any(|v| v.starts_with("IT")), "Should find IT VAT");
-    assert!(vat_texts.iter().any(|v| v.starts_with("NL")), "Should find NL VAT");
-    assert!(vat_texts.iter().any(|v| v.starts_with("BE")), "Should find BE VAT");
+    let vat_texts: Vec<&str> = vat_numbers
+        .iter()
+        .map(|f| f.matched_text.as_str())
+        .collect();
+    assert!(
+        vat_texts.iter().any(|v| v.starts_with("DE")),
+        "Should find DE VAT"
+    );
+    assert!(
+        vat_texts.iter().any(|v| v.starts_with("FR")),
+        "Should find FR VAT"
+    );
+    assert!(
+        vat_texts.iter().any(|v| v.starts_with("IT")),
+        "Should find IT VAT"
+    );
+    assert!(
+        vat_texts.iter().any(|v| v.starts_with("NL")),
+        "Should find NL VAT"
+    );
+    assert!(
+        vat_texts.iter().any(|v| v.starts_with("BE")),
+        "Should find BE VAT"
+    );
 }
 
 // =============================================================================
@@ -404,20 +430,41 @@ fn test_german_customer_record() {
     // Check for expected PII types
     let categories: Vec<_> = findings.iter().map(|f| &f.category).collect();
 
-    assert!(categories.contains(&&PiiCategory::Email), "Should find email");
-    assert!(categories.contains(&&PiiCategory::Phone), "Should find phone");
-    assert!(categories.contains(&&PiiCategory::TaxIdDe), "Should find German Tax ID");
-    assert!(categories.contains(&&PiiCategory::VatNumber), "Should find VAT number");
+    assert!(
+        categories.contains(&&PiiCategory::Email),
+        "Should find email"
+    );
+    assert!(
+        categories.contains(&&PiiCategory::Phone),
+        "Should find phone"
+    );
+    assert!(
+        categories.contains(&&PiiCategory::TaxIdDe),
+        "Should find German Tax ID"
+    );
+    assert!(
+        categories.contains(&&PiiCategory::VatNumber),
+        "Should find VAT number"
+    );
     assert!(categories.contains(&&PiiCategory::Iban), "Should find IBAN");
 
     // Verify specific values
-    let tax_id = findings.iter().find(|f| f.category == PiiCategory::TaxIdDe).unwrap();
+    let tax_id = findings
+        .iter()
+        .find(|f| f.category == PiiCategory::TaxIdDe)
+        .unwrap();
     assert_eq!(tax_id.matched_text.as_str(), "82695413025");
 
-    let vat = findings.iter().find(|f| f.category == PiiCategory::VatNumber).unwrap();
+    let vat = findings
+        .iter()
+        .find(|f| f.category == PiiCategory::VatNumber)
+        .unwrap();
     assert_eq!(vat.matched_text.as_str(), "DE298765432");
 
-    let iban = findings.iter().find(|f| f.category == PiiCategory::Iban).unwrap();
+    let iban = findings
+        .iter()
+        .find(|f| f.category == PiiCategory::Iban)
+        .unwrap();
     assert!(iban.matched_text.as_str().starts_with("DE89"));
 }
 
@@ -449,12 +496,27 @@ fn test_swiss_employee_record() {
 
     let categories: Vec<_> = findings.iter().map(|f| &f.category).collect();
 
-    assert!(categories.contains(&&PiiCategory::AhvCh), "Should find Swiss AHV");
-    assert!(categories.contains(&&PiiCategory::VatNumber), "Should find Swiss VAT");
-    assert!(categories.contains(&&PiiCategory::Iban), "Should find Swiss IBAN");
-    assert!(categories.contains(&&PiiCategory::Phone), "Should find phone");
+    assert!(
+        categories.contains(&&PiiCategory::AhvCh),
+        "Should find Swiss AHV"
+    );
+    assert!(
+        categories.contains(&&PiiCategory::VatNumber),
+        "Should find Swiss VAT"
+    );
+    assert!(
+        categories.contains(&&PiiCategory::Iban),
+        "Should find Swiss IBAN"
+    );
+    assert!(
+        categories.contains(&&PiiCategory::Phone),
+        "Should find phone"
+    );
 
-    let ahv = findings.iter().find(|f| f.category == PiiCategory::AhvCh).unwrap();
+    let ahv = findings
+        .iter()
+        .find(|f| f.category == PiiCategory::AhvCh)
+        .unwrap();
     assert_eq!(ahv.matched_text.as_str(), "756.3456.7890.12");
 }
 
@@ -497,11 +559,23 @@ fn test_austrian_business_document() {
 
     let categories: Vec<_> = findings.iter().map(|f| &f.category).collect();
 
-    assert!(categories.contains(&&PiiCategory::VatNumber), "Should find Austrian VAT");
-    assert!(categories.contains(&&PiiCategory::Iban), "Should find Austrian IBAN");
-    assert!(categories.contains(&&PiiCategory::Phone), "Should find Austrian phone");
+    assert!(
+        categories.contains(&&PiiCategory::VatNumber),
+        "Should find Austrian VAT"
+    );
+    assert!(
+        categories.contains(&&PiiCategory::Iban),
+        "Should find Austrian IBAN"
+    );
+    assert!(
+        categories.contains(&&PiiCategory::Phone),
+        "Should find Austrian phone"
+    );
 
-    let vat = findings.iter().find(|f| f.category == PiiCategory::VatNumber).unwrap();
+    let vat = findings
+        .iter()
+        .find(|f| f.category == PiiCategory::VatNumber)
+        .unwrap();
     assert_eq!(vat.matched_text.as_str(), "ATU87654321");
 }
 
@@ -524,13 +598,34 @@ fn test_international_supplier_database() {
     let findings = registry.detect_all(&segments);
 
     // Count findings by category
-    let vat_count = findings.iter().filter(|f| f.category == PiiCategory::VatNumber).count();
-    let iban_count = findings.iter().filter(|f| f.category == PiiCategory::Iban).count();
-    let phone_count = findings.iter().filter(|f| f.category == PiiCategory::Phone).count();
+    let vat_count = findings
+        .iter()
+        .filter(|f| f.category == PiiCategory::VatNumber)
+        .count();
+    let iban_count = findings
+        .iter()
+        .filter(|f| f.category == PiiCategory::Iban)
+        .count();
+    let phone_count = findings
+        .iter()
+        .filter(|f| f.category == PiiCategory::Phone)
+        .count();
 
-    assert!(vat_count >= 5, "Should find at least 5 VAT numbers, found {}", vat_count);
-    assert!(iban_count >= 5, "Should find at least 5 IBANs, found {}", iban_count);
-    assert!(phone_count >= 5, "Should find at least 5 phone numbers, found {}", phone_count);
+    assert!(
+        vat_count >= 5,
+        "Should find at least 5 VAT numbers, found {}",
+        vat_count
+    );
+    assert!(
+        iban_count >= 5,
+        "Should find at least 5 IBANs, found {}",
+        iban_count
+    );
+    assert!(
+        phone_count >= 5,
+        "Should find at least 5 phone numbers, found {}",
+        phone_count
+    );
 }
 
 // =============================================================================
@@ -576,7 +671,10 @@ fn test_no_false_positives_on_phone_like_numbers() {
 
     // Should find phone but the 11-digit pattern shouldn't match
     // because phone numbers have different formats
-    let phones: Vec<_> = findings.iter().filter(|f| f.category == PiiCategory::Phone).collect();
+    let phones: Vec<_> = findings
+        .iter()
+        .filter(|f| f.category == PiiCategory::Phone)
+        .collect();
     assert!(!phones.is_empty(), "Should find phone number");
 }
 
@@ -613,10 +711,19 @@ fn test_confidence_scores_are_reasonable() {
 
     // Verify we found the expected categories
     let categories: Vec<_> = findings.iter().map(|f| &f.category).collect();
-    assert!(categories.contains(&&PiiCategory::TaxIdDe), "Should find Tax ID");
+    assert!(
+        categories.contains(&&PiiCategory::TaxIdDe),
+        "Should find Tax ID"
+    );
     assert!(categories.contains(&&PiiCategory::AhvCh), "Should find AHV");
-    assert!(categories.contains(&&PiiCategory::VatNumber), "Should find VAT");
-    assert!(categories.contains(&&PiiCategory::NationalIdDe), "Should find National ID");
+    assert!(
+        categories.contains(&&PiiCategory::VatNumber),
+        "Should find VAT"
+    );
+    assert!(
+        categories.contains(&&PiiCategory::NationalIdDe),
+        "Should find National ID"
+    );
 }
 
 // =============================================================================
@@ -635,7 +742,7 @@ fn test_performance_large_document() {
         document.push_str(&format!(
             "Kunde {}: Steuer-ID: {}{:010}, USt-IdNr.: DE{:09}, AHV: 756.{:04}.{:04}.{:02}\n",
             i,
-            (i % 9) + 1,  // First digit 1-9
+            (i % 9) + 1, // First digit 1-9
             i * 12345 % 10000000000u64,
             i * 11111 % 1000000000,
             i % 10000,

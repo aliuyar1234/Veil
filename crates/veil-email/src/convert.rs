@@ -214,7 +214,9 @@ mod tests {
         let segments = header.to_text_segments(0);
         assert_eq!(segments.len(), 2);
         assert!(segments.iter().any(|s| s.content.as_str() == "John Doe"));
-        assert!(segments.iter().any(|s| s.content.as_str() == "john@example.com"));
+        assert!(segments
+            .iter()
+            .any(|s| s.content.as_str() == "john@example.com"));
     }
 
     #[test]

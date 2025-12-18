@@ -8,20 +8,6 @@ use std::path::Path;
 use zip::write::FileOptions;
 use zip::ZipWriter;
 
-/// Content Types XML (required for all OOXML formats)
-#[allow(dead_code)]
-const CONTENT_TYPES_XML: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-</Types>"#;
-
-/// Root relationships
-#[allow(dead_code)]
-const RELS_XML: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-</Relationships>"#;
-
 pub fn ensure_fixtures_dir() -> std::io::Result<()> {
     let base = Path::new("tests/fixtures");
     fs::create_dir_all(base.join("docx"))?;

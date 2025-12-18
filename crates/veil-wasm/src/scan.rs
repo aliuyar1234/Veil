@@ -102,7 +102,7 @@ fn perform_scan(
             return Err(WasmError::invalid_config(
                 "includeValues requires acknowledgeExposure to be true. \
                  Set {includeValues: true, acknowledgeExposure: true} to confirm \
-                 you understand the security implications of including PII values."
+                 you understand the security implications of including PII values.",
             ));
         }
         true
@@ -156,13 +156,7 @@ fn perform_scan(
             None
         };
 
-        findings.push(Finding::new(
-            category_name,
-            value,
-            start,
-            end,
-            confidence,
-        ));
+        findings.push(Finding::new(category_name, value, start, end, confidence));
     }
 
     Ok(findings)
@@ -344,7 +338,7 @@ mod tests {
     fn test_scan_with_empty_category_filter() {
         let data = b"Email: test@example.com";
         let options = ScanOptions {
-            categories: vec![],  // Empty means all categories
+            categories: vec![], // Empty means all categories
             ..Default::default()
         };
 

@@ -317,7 +317,7 @@ mod tests {
     fn test_protect_with_empty_category_filter() {
         let data = b"Email: test@example.com";
         let options = ProtectOptions {
-            categories: vec![],  // Empty means all categories
+            categories: vec![], // Empty means all categories
             style: ProtectStyle::Labels,
             ..Default::default()
         };

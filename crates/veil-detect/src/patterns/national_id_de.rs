@@ -22,9 +22,8 @@ const VALID_CHARS: &str = "0123456789CFGHJKLMNPRTVWXY";
 
 /// Regex pattern for German National ID.
 /// Starts with a letter, followed by 8 alphanumeric, ends with digit.
-static NATIONAL_ID_DE_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\b[CFGHJKLMNPRTVWXY][0-9CFGHJKLMNPRTVWXY]{8}[0-9]\b").unwrap()
-});
+static NATIONAL_ID_DE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\b[CFGHJKLMNPRTVWXY][0-9CFGHJKLMNPRTVWXY]{8}[0-9]\b").unwrap());
 
 /// Detector for German National ID (Personalausweis).
 pub struct NationalIdDeDetector;

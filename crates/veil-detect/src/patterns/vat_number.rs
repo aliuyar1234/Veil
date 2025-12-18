@@ -187,7 +187,10 @@ impl Detector for VatNumberDetector {
 
     fn validate(&self, matched: &str) -> ValidationStatus {
         let upper = matched.to_uppercase();
-        let clean: String = upper.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+        let clean: String = upper
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric())
+            .collect();
 
         // Determine country
         let country = if clean.starts_with("DE") {

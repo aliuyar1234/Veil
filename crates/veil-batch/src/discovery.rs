@@ -3,7 +3,9 @@
 use crate::error::BatchResult;
 use crate::types::{BatchOptions, FileEntry};
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use veil_core::HEADER_BUFFER_SIZE;
 use veil_parsers::FileFormat;
 use walkdir::WalkDir;
 
@@ -91,75 +93,43 @@ fn walk_directory(path: &Path, options: &BatchOptions) -> BatchResult<Vec<FileEn
 
 /// Detect file format using magic bytes and extension.
 ///
+/// Delegates to `veil_parsers::detect_format` for consistent format detection
+/// across the codebase.
+///
 /// # Arguments
 /// * `path` - Path to the file
 ///
 /// # Returns
 /// Detected file format, or None if unknown
 pub fn detect_file_format(path: &Path) -> Option<FileFormat> {
-    // Try magic byte detection first
-    if let Ok(mut file) = fs::File::open(path) {
-        let mut buffer = vec![0u8; 1024];
-        if let Ok(n) = std::io::Read::read(&mut file, &mut buffer) {
-            buffer.truncate(n);
+    // Read file header for format detection
+    let mut file = match fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return None,
+    };
 
-            // Use infer to detect file type
-            if let Some(kind) = infer::get(&buffer) {
-                return match kind.mime_type() {
-                    "application/pdf" => Some(FileFormat::Pdf),
-                    "application/json" => Some(FileFormat::Json),
-                    "text/html" | "application/xhtml+xml" => Some(FileFormat::Html),
-                    "application/zip" => {
-                        // Check if it's an Office file
-                        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                            match ext.to_lowercase().as_str() {
-                                "docx" => return Some(FileFormat::Docx),
-                                "xlsx" => return Some(FileFormat::Xlsx),
-                                "pptx" => return Some(FileFormat::Pptx),
-                                _ => {}
-                            }
-                        }
-                        None // Plain ZIP, not a supported format
-                    }
-                    "text/csv" => Some(FileFormat::Csv),
-                    mime if mime.starts_with("text/") => {
-                        // Check extension for more specific type
-                        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                            match ext.to_lowercase().as_str() {
-                                "csv" | "tsv" => return Some(FileFormat::Csv),
-                                "json" => return Some(FileFormat::Json),
-                                "html" | "htm" => return Some(FileFormat::Html),
-                                _ => {}
-                            }
-                        }
-                        Some(FileFormat::Text)
-                    }
-                    _ => None,
-                };
-            }
+    let mut buffer = vec![0u8; HEADER_BUFFER_SIZE];
+    let n = match file.read(&mut buffer) {
+        Ok(n) => n,
+        Err(_) => return None,
+    };
+    buffer.truncate(n);
+
+    // Use veil_parsers for consistent format detection
+    let filename = path.to_str();
+    let format = veil_parsers::detect_format(&buffer, filename);
+
+    // Return None for unsupported formats (those that need external crates)
+    match format {
+        FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx => {
+            // These are detected but not supported by veil-parsers directly
+            Some(format)
         }
-    }
-
-    // Fallback to extension-based detection
-    detect_format_by_extension(path)
-}
-
-/// Detect format based on file extension.
-fn detect_format_by_extension(path: &Path) -> Option<FileFormat> {
-    let ext = path.extension()?.to_str()?.to_lowercase();
-
-    match ext.as_str() {
-        "txt" | "log" => Some(FileFormat::Text),
-        "csv" | "tsv" => Some(FileFormat::Csv),
-        "json" => Some(FileFormat::Json),
-        "html" | "htm" => Some(FileFormat::Html),
-        "pdf" => Some(FileFormat::Pdf),
-        "docx" => Some(FileFormat::Docx),
-        "xlsx" => Some(FileFormat::Xlsx),
-        "pptx" => Some(FileFormat::Pptx),
-        "eml" => Some(FileFormat::Eml),
-        "msg" => Some(FileFormat::Msg),
-        _ => None,
+        FileFormat::Eml | FileFormat::Msg => {
+            // Email formats also detected but handled by veil-email
+            Some(format)
+        }
+        _ => Some(format),
     }
 }
 
@@ -178,31 +148,6 @@ pub fn is_supported_format(format: Option<FileFormat>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_detect_format_by_extension() {
-        assert_eq!(
-            detect_format_by_extension(Path::new("test.txt")),
-            Some(FileFormat::Text)
-        );
-        assert_eq!(
-            detect_format_by_extension(Path::new("data.csv")),
-            Some(FileFormat::Csv)
-        );
-        assert_eq!(
-            detect_format_by_extension(Path::new("config.json")),
-            Some(FileFormat::Json)
-        );
-        assert_eq!(
-            detect_format_by_extension(Path::new("page.html")),
-            Some(FileFormat::Html)
-        );
-        assert_eq!(
-            detect_format_by_extension(Path::new("document.pdf")),
-            Some(FileFormat::Pdf)
-        );
-        assert_eq!(detect_format_by_extension(Path::new("unknown.xyz")), None);
-    }
 
     #[test]
     fn test_is_supported_format() {

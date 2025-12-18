@@ -63,6 +63,14 @@ fake = { version = "2.9", features = ["derive"] }
 # Testing
 pretty_assertions = "1.4"
 tempfile = "3.10"
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.4"
+
+# Performance optimization
+memchr = "2"
+
+# Logging
+tracing = "0.1"
 
 # TTY detection
 atty = "0.2"
@@ -89,19 +97,6 @@ js-sys = "0.3.68"
 web-sys = { version = "0.3.68", features = ["console"] }
 serde-wasm-bindgen = "0.6"
 getrandom = { version = "0.3", features = ["wasm_js"] }
-
-# API Server
-axum = { version = "0.7", features = ["multipart", "tokio"] }
-tokio = { version = "1.35", features = ["full"] }
-tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.5", features = ["cors", "trace", "request-id", "util"] }
-jsonwebtoken = "9.3"
-hyper = { version = "1.0", features = ["full"] }
-bytes = "1.5"
-mime = "0.3"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-toml = "0.8"
 
 # Optimized release profile for WASM builds
 [profile.release]

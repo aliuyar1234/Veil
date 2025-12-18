@@ -71,7 +71,15 @@ pub fn run(args: ScanArgs, quiet: bool, json: bool) -> Result<()> {
     for path in &args.paths {
         if path.is_dir() {
             if args.recursive {
-                scan_directory(path, &registry, &policy, quiet, json, include_values, &mut all_results)?;
+                scan_directory(
+                    path,
+                    &registry,
+                    &policy,
+                    quiet,
+                    json,
+                    include_values,
+                    &mut all_results,
+                )?;
             } else if !quiet && !json {
                 eprintln!(
                     "Skipping directory: {} (use -r for recursive)",
@@ -262,7 +270,15 @@ fn scan_directory(
         let path = entry.path();
 
         if path.is_dir() {
-            scan_directory(&path, registry, policy, quiet, json, include_values, results)?;
+            scan_directory(
+                &path,
+                registry,
+                policy,
+                quiet,
+                json,
+                include_values,
+                results,
+            )?;
         } else {
             let ext = path
                 .extension()

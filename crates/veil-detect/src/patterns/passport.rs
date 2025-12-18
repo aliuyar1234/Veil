@@ -172,7 +172,10 @@ mod tests {
         assert!(matches!(result, ValidationStatus::Invalid { .. }));
 
         // Valid lengths
-        assert!(matches!(detector.validate("123456"), ValidationStatus::Valid));
+        assert!(matches!(
+            detector.validate("123456"),
+            ValidationStatus::Valid
+        ));
         assert!(matches!(
             detector.validate("1234567"),
             ValidationStatus::Valid

@@ -23,6 +23,7 @@
 mod encrypt;
 mod error;
 mod hash;
+pub mod key_provider;
 mod pseudonym;
 mod tokenize;
 mod types;
@@ -31,7 +32,8 @@ pub mod vault;
 pub use encrypt::{decrypt, decrypt_raw, encrypt, EncryptionConfig};
 pub use error::{CryptoError, VaultError};
 pub use hash::{generate_salt, hash, verify_hash, HashAlgorithm, HashConfig};
+pub use key_provider::{EnvKeyProvider, KeyMetadata, KeyProvider, LocalKeyProvider, SecretKey};
 pub use pseudonym::{pseudonymize, PseudonymConfig, PseudonymDataType};
 pub use tokenize::{delete_token, detokenize, tokenize, TokenConfig, TokenFormat};
 pub use types::{CryptoMetadata, CryptoResult, OutputFormat, ProtectionMode};
-pub use vault::{FileVault, InMemoryVault, TokenVault};
+pub use vault::{EncryptedVault, FileVault, InMemoryVault, TokenVault};

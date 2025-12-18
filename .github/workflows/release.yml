@@ -121,18 +121,46 @@ jobs:
       - name: Publish veil-wasm
         run: cargo publish -p veil-wasm --allow-dirty || true
 
+  sbom:
+    name: Generate SBOM
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-sbom
+        run: cargo install cargo-sbom
+
+      - name: Generate SBOM (CycloneDX format)
+        run: cargo sbom --output-format cyclonedx_json > sbom.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+
   github-release:
     name: Create GitHub Release
-    needs: validate
+    needs: [validate, sbom]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          files: sbom.json
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}

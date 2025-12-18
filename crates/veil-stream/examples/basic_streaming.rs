@@ -68,7 +68,7 @@ Address: 123 Main Street
 
     let config = StreamConfig {
         mode: ProcessingMode::ChunkByChunk,
-        chunk_size: 64, // Small chunks for demonstration
+        chunk_size: 64,         // Small chunks for demonstration
         include_content: false, // Don't include content in events
         ..Default::default()
     };
@@ -151,6 +151,10 @@ Address: 123 Main Street
         result.findings.len()
     );
     for finding in &result.findings {
-        println!("  - {}: {}", finding.category, finding.matched_text.as_str());
+        println!(
+            "  - {}: {}",
+            finding.category,
+            finding.matched_text.as_str()
+        );
     }
 }

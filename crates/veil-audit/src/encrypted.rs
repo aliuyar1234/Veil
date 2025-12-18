@@ -15,7 +15,7 @@ use crate::error::AuditError;
 use crate::logger::AuditFilter;
 
 /// Configuration for encrypted audit logging.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EncryptionConfig {
     /// 256-bit AES key (32 bytes).
     key: Vec<u8>,
@@ -27,11 +27,16 @@ impl EncryptionConfig {
     /// # Arguments
     /// * `key` - 32-byte AES-256 key
     ///
-    /// # Panics
-    /// Panics if the key is not exactly 32 bytes.
-    pub fn new(key: Vec<u8>) -> Self {
-        assert_eq!(key.len(), 32, "Key must be 32 bytes for AES-256");
-        Self { key }
+    /// # Errors
+    /// Returns `AuditError::InvalidKey` if the key is not exactly 32 bytes.
+    pub fn new(key: Vec<u8>) -> Result<Self, crate::error::AuditError> {
+        if key.len() != 32 {
+            return Err(crate::error::AuditError::InvalidKey {
+                expected: 32,
+                actual: key.len(),
+            });
+        }
+        Ok(Self { key })
     }
 
     /// Get the encryption key.
@@ -181,7 +186,10 @@ impl EncryptedAuditLogger {
     }
 
     /// Load the last checksum from the most recent log file.
-    fn load_last_checksum(log_dir: &PathBuf, config: &EncryptionConfig) -> Result<Option<String>, AuditError> {
+    fn load_last_checksum(
+        log_dir: &PathBuf,
+        config: &EncryptionConfig,
+    ) -> Result<Option<String>, AuditError> {
         if !log_dir.exists() {
             return Ok(None);
         }
@@ -217,13 +225,11 @@ fn encrypt_string(plaintext: &str, config: &EncryptionConfig) -> Result<String, 
     {
         use veil_crypto::{encrypt, EncryptionConfig as CryptoConfig, OutputFormat};
 
-        let crypto_config = CryptoConfig::new(config.key.clone())
-            .with_format(OutputFormat::Base64);
+        let crypto_config = CryptoConfig::with_format(config.key.clone(), OutputFormat::Base64);
 
-        let result = encrypt(plaintext.as_bytes(), &crypto_config)
-            .map_err(|e| AuditError::Io(std::io::Error::other(
-                format!("Encryption failed: {}", e),
-            )))?;
+        let result = encrypt(plaintext.as_bytes(), &crypto_config).map_err(|e| {
+            AuditError::Io(std::io::Error::other(format!("Encryption failed: {}", e)))
+        })?;
 
         Ok(result.value)
     }
@@ -240,22 +246,20 @@ fn encrypt_string(plaintext: &str, config: &EncryptionConfig) -> Result<String, 
 fn decrypt_string(ciphertext: &str, config: &EncryptionConfig) -> Result<String, AuditError> {
     #[cfg(feature = "encryption")]
     {
-        use veil_crypto::{decrypt, EncryptionConfig as CryptoConfig, CryptoResult, ProtectionMode, OutputFormat};
+        use veil_crypto::{
+            decrypt, CryptoResult, EncryptionConfig as CryptoConfig, OutputFormat, ProtectionMode,
+        };
 
-        let crypto_config = CryptoConfig::new(config.key.clone())
-            .with_format(OutputFormat::Base64);
+        let crypto_config = CryptoConfig::with_format(config.key.clone(), OutputFormat::Base64);
 
         let result = CryptoResult::new(ciphertext.to_string(), ProtectionMode::Encrypt);
 
-        let decrypted = decrypt(&result, &crypto_config)
-            .map_err(|e| AuditError::Io(std::io::Error::other(
-                format!("Decryption failed: {}", e),
-            )))?;
+        let decrypted = decrypt(&result, &crypto_config).map_err(|e| {
+            AuditError::Io(std::io::Error::other(format!("Decryption failed: {}", e)))
+        })?;
 
         String::from_utf8(decrypted)
-            .map_err(|e| AuditError::Io(std::io::Error::other(
-                format!("Invalid UTF-8: {}", e),
-            )))
+            .map_err(|e| AuditError::Io(std::io::Error::other(format!("Invalid UTF-8: {}", e))))
     }
 
     #[cfg(not(feature = "encryption"))]
@@ -264,9 +268,7 @@ fn decrypt_string(ciphertext: &str, config: &EncryptionConfig) -> Result<String,
         // When encryption feature is disabled, decode base64
         let bytes = base64_decode(ciphertext)?;
         String::from_utf8(bytes)
-            .map_err(|e| AuditError::Io(std::io::Error::other(
-                format!("Invalid UTF-8: {}", e),
-            )))
+            .map_err(|e| AuditError::Io(std::io::Error::other(format!("Invalid UTF-8: {}", e))))
     }
 }
 
@@ -311,12 +313,16 @@ fn base64_decode(data: &str) -> Result<Vec<u8>, AuditError> {
         }
 
         let decode = |b: u8| -> Result<u8, AuditError> {
-            ALPHABET.iter().position(|&x| x == b)
+            ALPHABET
+                .iter()
+                .position(|&x| x == b)
                 .map(|p| p as u8)
-                .ok_or_else(|| AuditError::Io(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Invalid base64",
-                )))
+                .ok_or_else(|| {
+                    AuditError::Io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Invalid base64",
+                    ))
+                })
         };
 
         let b0 = decode(chunk[0])?;
@@ -349,7 +355,7 @@ mod tests {
     }
 
     fn test_config() -> EncryptionConfig {
-        EncryptionConfig::new(test_key())
+        EncryptionConfig::new(test_key()).unwrap()
     }
 
     #[test]
@@ -415,8 +421,14 @@ mod tests {
 
         // Verify chain
         assert!(entries[0].previous_checksum.is_none());
-        assert_eq!(entries[1].previous_checksum, Some(entries[0].checksum.clone()));
-        assert_eq!(entries[2].previous_checksum, Some(entries[1].checksum.clone()));
+        assert_eq!(
+            entries[1].previous_checksum,
+            Some(entries[0].checksum.clone())
+        );
+        assert_eq!(
+            entries[2].previous_checksum,
+            Some(entries[1].checksum.clone())
+        );
     }
 
     #[test]
@@ -445,15 +457,23 @@ mod tests {
     #[test]
     fn test_encryption_config_creation() {
         let key = vec![1u8; 32];
-        let config = EncryptionConfig::new(key.clone());
+        let config = EncryptionConfig::new(key.clone()).unwrap();
         assert_eq!(config.key(), &key[..]);
     }
 
     #[test]
-    #[should_panic(expected = "Key must be 32 bytes")]
     fn test_encryption_config_invalid_key_length() {
         let key = vec![0u8; 16]; // Too short
-        let _ = EncryptionConfig::new(key);
+        let result = EncryptionConfig::new(key);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(
+            err,
+            crate::error::AuditError::InvalidKey {
+                expected: 32,
+                actual: 16
+            }
+        ));
     }
 
     #[test]
@@ -462,9 +482,27 @@ mod tests {
         let mut logger = EncryptedAuditLogger::new(temp_dir.path(), test_config()).unwrap();
 
         // Log different operations
-        logger.log(AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default())).unwrap();
-        logger.log(AuditEntry::new(AuditOperation::Protect, Default::default(), Default::default())).unwrap();
-        logger.log(AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default())).unwrap();
+        logger
+            .log(AuditEntry::new(
+                AuditOperation::Scan,
+                Default::default(),
+                Default::default(),
+            ))
+            .unwrap();
+        logger
+            .log(AuditEntry::new(
+                AuditOperation::Protect,
+                Default::default(),
+                Default::default(),
+            ))
+            .unwrap();
+        logger
+            .log(AuditEntry::new(
+                AuditOperation::Scan,
+                Default::default(),
+                Default::default(),
+            ))
+            .unwrap();
 
         // Query only scans
         let filter = AuditFilter {

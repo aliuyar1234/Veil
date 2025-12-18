@@ -14,7 +14,6 @@ uuid = { workspace = true }
 # File operations
 walkdir = { workspace = true }
 glob = { workspace = true }
-infer = { workspace = true }
 
 # Archives
 zip = { workspace = true }
@@ -29,6 +28,7 @@ indicatif = { workspace = true }
 tracing = { workspace = true }
 
 # Veil crates
+veil-core = { path = "../veil-core" }
 veil-parsers = { path = "../veil-parsers" }
 
 [dev-dependencies]

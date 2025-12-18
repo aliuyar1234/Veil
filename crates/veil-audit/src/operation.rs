@@ -35,8 +35,14 @@ mod tests {
     fn test_operation_display() {
         assert_eq!(AuditOperation::Scan.to_string(), "scan");
         assert_eq!(AuditOperation::Protect.to_string(), "protect");
-        assert_eq!(AuditOperation::PolicyValidate.to_string(), "policy_validate");
-        assert_eq!(AuditOperation::ReportGenerate.to_string(), "report_generate");
+        assert_eq!(
+            AuditOperation::PolicyValidate.to_string(),
+            "policy_validate"
+        );
+        assert_eq!(
+            AuditOperation::ReportGenerate.to_string(),
+            "report_generate"
+        );
     }
 
     #[test]

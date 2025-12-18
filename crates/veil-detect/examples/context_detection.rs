@@ -62,7 +62,10 @@ fn demonstrate_detection(text: &str, language: &str) {
         for finding in findings {
             println!(
                 "  - {} ({:?}): \"{}\" [confidence: {:.2}]",
-                finding.category, finding.validation, finding.matched_text.as_str(), finding.confidence
+                finding.category,
+                finding.validation,
+                finding.matched_text.as_str(),
+                finding.confidence
             );
             if let Some(reasoning) = &finding.context_reasoning {
                 for reason in reasoning {

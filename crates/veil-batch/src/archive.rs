@@ -1,6 +1,5 @@
 //! ZIP archive processing.
 
-use crate::discovery::detect_file_format;
 use crate::error::{BatchError, BatchResult};
 use crate::types::{BatchOptions, FileEntry};
 use std::fs::File;
@@ -147,26 +146,23 @@ pub fn process_archive(
         // Create a virtual path for the archived file
         let virtual_path = PathBuf::from(file_name.clone());
 
-        // Detect format
+        // Detect format using veil_parsers
         let mut buffer = vec![0u8; 1024.min(size as usize)];
         let bytes_read = zip_file.read(&mut buffer)?;
         buffer.truncate(bytes_read);
 
         let format = if bytes_read > 0 {
-            if let Some(kind) = infer::get(&buffer) {
-                if kind.mime_type() == "application/zip" {
-                    // Nested ZIP - we'll need to extract and process recursively
-                    // For now, we'll skip recursive ZIP processing in this function
-                    // and handle it in the batch processor
-                    None
-                } else {
-                    detect_file_format(&virtual_path)
-                }
+            // Check for nested ZIP (PK signature)
+            if buffer.starts_with(&[0x50, 0x4B, 0x03, 0x04]) {
+                // Nested ZIP - skip for now, handle in batch processor
+                None
             } else {
-                detect_file_format(&virtual_path)
+                // Use veil_parsers for consistent detection
+                Some(veil_parsers::detect_format(&buffer, Some(&file_name)))
             }
         } else {
-            detect_file_format(&virtual_path)
+            // Empty file - try extension-based detection
+            Some(veil_parsers::detect_format(&[], Some(&file_name)))
         };
 
         let mut entry = FileEntry::new(virtual_path, size, format);

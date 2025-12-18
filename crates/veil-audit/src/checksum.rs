@@ -90,7 +90,9 @@ mod tests {
         // SHA-256 produces 64 hex characters
         assert_eq!(checksum.len(), 64);
         // Should be all lowercase hex characters
-        assert!(checksum.chars().all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
+        assert!(checksum
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
     }
 
     #[test]
@@ -114,8 +116,11 @@ mod tests {
             AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default());
         entry1.checksum = calculate_checksum(&entry1);
 
-        let mut entry2 =
-            AuditEntry::new(AuditOperation::Protect, Default::default(), Default::default());
+        let mut entry2 = AuditEntry::new(
+            AuditOperation::Protect,
+            Default::default(),
+            Default::default(),
+        );
         entry2.previous_checksum = Some(entry1.checksum.clone());
         entry2.checksum = calculate_checksum(&entry2);
 
@@ -128,8 +133,11 @@ mod tests {
             AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default());
         entry1.checksum = calculate_checksum(&entry1);
 
-        let mut entry2 =
-            AuditEntry::new(AuditOperation::Protect, Default::default(), Default::default());
+        let mut entry2 = AuditEntry::new(
+            AuditOperation::Protect,
+            Default::default(),
+            Default::default(),
+        );
         // Wrong previous checksum
         entry2.previous_checksum = Some("wrong_checksum".to_string());
         entry2.checksum = calculate_checksum(&entry2);
@@ -150,7 +158,10 @@ mod tests {
 
         let result = verify_chain(&[entry]);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AuditError::ChecksumMismatch(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            AuditError::ChecksumMismatch(_)
+        ));
     }
 
     #[test]
@@ -159,12 +170,18 @@ mod tests {
             AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default());
         entry1.checksum = calculate_checksum(&entry1);
 
-        let mut entry2a =
-            AuditEntry::new(AuditOperation::Protect, Default::default(), Default::default());
+        let mut entry2a = AuditEntry::new(
+            AuditOperation::Protect,
+            Default::default(),
+            Default::default(),
+        );
         entry2a.previous_checksum = Some(entry1.checksum.clone());
 
-        let mut entry2b =
-            AuditEntry::new(AuditOperation::Protect, Default::default(), Default::default());
+        let mut entry2b = AuditEntry::new(
+            AuditOperation::Protect,
+            Default::default(),
+            Default::default(),
+        );
         entry2b.previous_checksum = Some("different_previous".to_string());
 
         // Same entry content but different previous checksums should yield different checksums

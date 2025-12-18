@@ -20,6 +20,7 @@ mod detect;
 mod error;
 mod html;
 mod json;
+#[cfg(feature = "pdf")]
 pub mod pdf;
 pub mod stream;
 mod text;
@@ -34,6 +35,8 @@ pub use types::{
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+
+use veil_core::{DEFAULT_MAX_FILE_SIZE, HEADER_BUFFER_SIZE};
 
 /// Parse a file at the given path.
 ///
@@ -54,7 +57,7 @@ pub fn parse_file(
     let size = metadata.len() as usize;
 
     // Check file size limit
-    let max_size = options.max_size_bytes.unwrap_or(100 * 1024 * 1024);
+    let max_size = options.max_size_bytes.unwrap_or(DEFAULT_MAX_FILE_SIZE);
     if size > max_size {
         return Err(ParseError::FileTooLarge {
             size,
@@ -64,8 +67,8 @@ pub fn parse_file(
 
     let mut options = options.clone();
     if options.format.is_none() {
-        // Read first 1KB for format detection
-        let mut buf = vec![0u8; 1024.min(size)];
+        // Read first bytes for format detection
+        let mut buf = vec![0u8; HEADER_BUFFER_SIZE.min(size)];
         let mut f = File::open(path)?;
         let n = f.read(&mut buf)?;
         buf.truncate(n);
@@ -86,7 +89,7 @@ pub fn parse_file(
 /// * `Ok(ParseResult)` - Parsed content with metadata
 /// * `Err(ParseError)` - If parsing fails
 pub fn parse_bytes(bytes: &[u8], options: &ParseOptions) -> Result<ParseResult, ParseError> {
-    let max_size = options.max_size_bytes.unwrap_or(100 * 1024 * 1024);
+    let max_size = options.max_size_bytes.unwrap_or(DEFAULT_MAX_FILE_SIZE);
     if bytes.len() > max_size {
         return Err(ParseError::FileTooLarge {
             size: bytes.len(),
@@ -103,7 +106,12 @@ pub fn parse_bytes(bytes: &[u8], options: &ParseOptions) -> Result<ParseResult, 
         FileFormat::Csv => csv::CsvParser::new().parse_bytes(bytes, options),
         FileFormat::Json => json::JsonParser::new().parse_bytes(bytes, options),
         FileFormat::Html => html::HtmlParser::new().parse_bytes(bytes, options),
+        #[cfg(feature = "pdf")]
         FileFormat::Pdf => pdf::PdfParser::new().parse_bytes(bytes, options),
+        #[cfg(not(feature = "pdf"))]
+        FileFormat::Pdf => Err(ParseError::UnsupportedFormat(Some(
+            "PDF support requires the 'pdf' feature".to_string(),
+        ))),
         // Office formats are handled by veil-office crate
         FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx => {
             Err(ParseError::UnsupportedFormat(Some(format!(
@@ -196,7 +204,7 @@ fn parse_reader_streaming_impl<R: Read>(
 
     // Detect format from first chunk if not specified
     let mut buf_reader = BufReader::new(reader);
-    let mut header = vec![0u8; 1024];
+    let mut header = vec![0u8; HEADER_BUFFER_SIZE];
 
     // We need to read the header for detection, then continue
     let n = std::io::Read::read(&mut buf_reader, &mut header)?;
@@ -218,8 +226,9 @@ fn parse_reader_streaming_impl<R: Read>(
 
     // Use streaming
     let chained = std::io::Cursor::new(header).chain(buf_reader);
-    let stream = stream::ParseStream::new(chained, format, options)?
-        .ok_or_else(|| ParseError::UnsupportedFormat(Some("Format does not support streaming".to_string())))?;
+    let stream = stream::ParseStream::new(chained, format, options)?.ok_or_else(|| {
+        ParseError::UnsupportedFormat(Some("Format does not support streaming".to_string()))
+    })?;
 
     let mut segments = Vec::new();
     let mut warnings = Vec::new();
@@ -243,7 +252,10 @@ fn parse_reader_streaming_impl<R: Read>(
     }
 
     let encoding = match format {
-        FileFormat::Text => options.encoding.clone().unwrap_or_else(|| "UTF-8".to_string()),
+        FileFormat::Text => options
+            .encoding
+            .clone()
+            .unwrap_or_else(|| "UTF-8".to_string()),
         _ => "UTF-8".to_string(),
     };
 
@@ -275,6 +287,7 @@ pub fn detect_format(bytes: &[u8], filename: Option<&str>) -> FileFormat {
 }
 
 /// Check if a file format is supported.
+#[cfg(feature = "pdf")]
 pub fn is_supported(format: FileFormat) -> bool {
     matches!(
         format,
@@ -282,7 +295,23 @@ pub fn is_supported(format: FileFormat) -> bool {
     )
 }
 
+/// Check if a file format is supported.
+#[cfg(not(feature = "pdf"))]
+pub fn is_supported(format: FileFormat) -> bool {
+    matches!(
+        format,
+        FileFormat::Text | FileFormat::Csv | FileFormat::Json | FileFormat::Html
+    )
+}
+
 /// Get list of supported file extensions.
+#[cfg(feature = "pdf")]
 pub fn supported_extensions() -> &'static [&'static str] {
     &["txt", "log", "csv", "tsv", "json", "html", "htm", "pdf"]
+}
+
+/// Get list of supported file extensions.
+#[cfg(not(feature = "pdf"))]
+pub fn supported_extensions() -> &'static [&'static str] {
+    &["txt", "log", "csv", "tsv", "json", "html", "htm"]
 }

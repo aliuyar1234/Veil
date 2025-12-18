@@ -64,9 +64,7 @@ impl Detector for SsnDetector {
                 let end = m.end();
 
                 // Prevent overlapping matches
-                let overlaps = seen_ranges
-                    .iter()
-                    .any(|(s, e)| start < *e && end > *s);
+                let overlaps = seen_ranges.iter().any(|(s, e)| start < *e && end > *s);
 
                 if !overlaps {
                     seen_ranges.push((start, end));

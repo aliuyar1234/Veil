@@ -18,8 +18,7 @@ use crate::finding::ValidationStatus;
 
 /// Regex pattern for German Tax ID.
 /// 11 consecutive digits, first digit not 0.
-static TAX_ID_DE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b[1-9]\d{10}\b").unwrap());
+static TAX_ID_DE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b[1-9]\d{10}\b").unwrap());
 
 /// Detector for German Tax ID (Steueridentifikationsnummer).
 pub struct TaxIdDeDetector;

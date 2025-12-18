@@ -10,19 +10,33 @@ use std::time::Instant;
 use veil_parsers::FileFormat;
 
 /// Build a thread pool with the specified number of threads.
-/// Falls back to a single-threaded pool if construction fails.
-fn build_thread_pool(num_threads: usize) -> rayon::ThreadPool {
-    rayon::ThreadPoolBuilder::new()
+/// Falls back to a single-threaded pool, then to the global pool if construction fails.
+fn build_thread_pool(num_threads: usize) -> Option<rayon::ThreadPool> {
+    match rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .build()
-        .unwrap_or_else(|e| {
-            tracing::warn!("Failed to build thread pool with {} threads: {}, using single thread", num_threads, e);
-            // Fallback: try with 1 thread, and if that fails, use the global pool
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(1)
-                .build()
-                .expect("Failed to create even a single-threaded pool - system resource exhaustion")
-        })
+    {
+        Ok(pool) => Some(pool),
+        Err(e) => {
+            tracing::warn!(
+                "Failed to build thread pool with {} threads: {}, trying single thread",
+                num_threads,
+                e
+            );
+            // Fallback: try with 1 thread
+            match rayon::ThreadPoolBuilder::new().num_threads(1).build() {
+                Ok(pool) => Some(pool),
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to create single-threaded pool: {}, using global pool",
+                        e
+                    );
+                    // Return None to signal use of global pool
+                    None
+                }
+            }
+        }
+    }
 }
 
 /// Thread-local accumulator for batch processing results.
@@ -90,7 +104,8 @@ pub fn process_files_parallel(
     let pool = build_thread_pool(num_threads);
 
     // Use thread-local accumulation with fold/reduce to avoid mutex contention
-    let accumulator = pool.install(|| {
+    // If pool creation failed, use the global rayon pool
+    let process_fn = || {
         files
             .par_iter()
             .fold(BatchAccumulator::new, |mut acc, entry| {
@@ -137,7 +152,13 @@ pub fn process_files_parallel(
                 acc
             })
             .reduce(BatchAccumulator::new, BatchAccumulator::merge)
-    });
+    };
+
+    // Execute in custom pool if available, otherwise use global pool
+    let accumulator = match pool {
+        Some(p) => p.install(process_fn),
+        None => process_fn(),
+    };
 
     accumulator.into_parts()
 }

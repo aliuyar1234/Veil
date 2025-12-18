@@ -54,6 +54,14 @@ pub enum CryptoError {
     /// Invalid configuration.
     #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
+
+    /// Key not found in provider.
+    #[error("Key not found: {0}")]
+    KeyNotFound(String),
+
+    /// Key management operation failed.
+    #[error("Key management error: {0}")]
+    KeyManagement(String),
 }
 
 /// Errors that can occur during vault operations.

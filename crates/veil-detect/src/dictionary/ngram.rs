@@ -223,7 +223,7 @@ mod tests {
         // "hallo" should match both "hello" and "hallo" due to shared ngrams
         let candidates = index.find_candidates("hallo");
         assert!(candidates.contains(&2)); // hallo (exact)
-        // hello may or may not be included depending on overlap
+                                          // hello may or may not be included depending on overlap
     }
 
     #[test]

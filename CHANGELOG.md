@@ -8,6 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Encrypted vault storage**: New `EncryptedVault` for secure token-to-original mappings
+  - AES-256-GCM with envelope encryption pattern
+  - `KeyProvider` trait for key management abstraction
+  - `LocalKeyProvider` for file-based key storage
+  - `EnvKeyProvider` for environment variable keys (12-factor app support)
+  - Key rotation support without re-encrypting all data
+- **Enhanced CI pipeline**: Comprehensive quality gates
+  - Code coverage with `cargo-llvm-cov` (90% threshold)
+  - Mutation testing with `cargo-mutants` (80% threshold)
+  - SBOM generation using `cargo-sbom` in release workflow
+- **Benchmark infrastructure**: Criterion benchmarks for performance tracking
+  - Detection benchmarks (`cargo bench -p veil-detect`)
+  - Parsing benchmarks (`cargo bench -p veil-parsers`)
+  - Encryption benchmarks (`cargo bench -p veil-crypto`)
+- **Fuzz testing**: Coverage-guided fuzzing targets
+  - PDF parser fuzzing
+  - Email parser fuzzing
+  - Office document fuzzing
+  - YAML policy fuzzing
+- **Property-based testing**: `proptest` tests for validators
+  - Email format validation
+  - Phone number validation
+  - SSN validation
+- **Documentation**: Architecture and examples
+  - `docs/ARCHITECTURE.md` with Mermaid diagrams
+  - `examples/basic_scan.rs` - Simple PII detection
+  - `examples/batch_processing.rs` - Directory scanning
+  - `examples/policy_usage.rs` - YAML policy application
+  - `examples/streaming.rs` - Chunk-based processing
 - **PII memory zeroization**: Secure memory cleanup for enterprise security compliance (SOC2/HIPAA/PCI-DSS)
   - New `veil-core` crate with `SensitiveString` type that securely zeroes memory on drop
   - `Finding.matched_text` now uses `SensitiveString` - PII values automatically zeroed when findings are dropped
@@ -30,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 20 new phone number test cases covering all supported formats
 
 ### Changed
+- **Security**: `SensitiveString::eq` now uses constant-time comparison via `subtle` crate to prevent timing attacks
 - **BREAKING**: Scan API responses no longer include PII values by default (security fix)
   - Add `include_values=true` query parameter + `X-Acknowledge-PII-Exposure: accepted` header to include values
 - **BREAKING**: CLI scan output no longer includes PII values by default

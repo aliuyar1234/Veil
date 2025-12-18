@@ -1,8 +1,10 @@
 //! Token vault storage abstraction.
 
+mod encrypted;
 mod file;
 mod memory;
 
+pub use encrypted::EncryptedVault;
 pub use file::FileVault;
 pub use memory::InMemoryVault;
 

@@ -18,7 +18,9 @@ fn test_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Detect and redact personally identifiable information"))
+        .stdout(predicate::str::contains(
+            "Detect and redact personally identifiable information",
+        ))
         .stdout(predicate::str::contains("scan"))
         .stdout(predicate::str::contains("protect"))
         .stdout(predicate::str::contains("batch"));
@@ -149,11 +151,7 @@ fn test_scan_multiple_files() {
     fs::write(&file2, "Email: user2@example.com").unwrap();
 
     veil_cmd()
-        .args([
-            "scan",
-            file1.to_str().unwrap(),
-            file2.to_str().unwrap(),
-        ])
+        .args(["scan", file1.to_str().unwrap(), file2.to_str().unwrap()])
         .assert()
         .success();
 }
@@ -372,10 +370,7 @@ fn test_stream_from_stdin() {
 
 #[test]
 fn test_invalid_command() {
-    veil_cmd()
-        .arg("invalid-command")
-        .assert()
-        .failure();
+    veil_cmd().arg("invalid-command").assert().failure();
 }
 
 #[test]
@@ -389,8 +384,5 @@ fn test_scan_missing_path() {
 
 #[test]
 fn test_protect_missing_input() {
-    veil_cmd()
-        .arg("protect")
-        .assert()
-        .failure();
+    veil_cmd().arg("protect").assert().failure();
 }

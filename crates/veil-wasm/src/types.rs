@@ -275,7 +275,13 @@ mod tests {
 
     #[test]
     fn test_scan_result_new() {
-        let findings = vec![Finding::new("email", Some("test@example.com".to_string()), 0, 16, 0.9)];
+        let findings = vec![Finding::new(
+            "email",
+            Some("test@example.com".to_string()),
+            0,
+            16,
+            0.9,
+        )];
         let stats = ScanStats::new(100, 10);
         let result = ScanResult::new(findings.clone(), stats);
 

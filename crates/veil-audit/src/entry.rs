@@ -166,7 +166,9 @@ mod tests {
         params.input.push(PathBuf::from("/test/file.txt"));
         params.output = Some(PathBuf::from("/test/output.txt"));
         params.policy = Some("default".to_string());
-        params.metadata.insert("user".to_string(), "test".to_string());
+        params
+            .metadata
+            .insert("user".to_string(), "test".to_string());
 
         assert_eq!(params.input.len(), 1);
         assert!(params.output.is_some());

@@ -2,6 +2,7 @@
 
 use thiserror::Error;
 
+#[cfg(feature = "pdf")]
 use crate::pdf::PdfError;
 
 /// Errors that can occur during parsing.
@@ -29,6 +30,7 @@ pub enum ParseError {
     JsonError(#[from] serde_json::Error),
 
     /// PDF parsing error.
+    #[cfg(feature = "pdf")]
     #[error("PDF error: {0}")]
     PdfError(#[from] PdfError),
 
