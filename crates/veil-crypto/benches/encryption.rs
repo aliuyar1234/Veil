@@ -3,7 +3,10 @@
 //! Run with: `cargo bench -p veil-crypto`
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use veil_crypto::{encrypt, hash, tokenize, EncryptionConfig, HashConfig, TokenConfig, TokenVault};
+use std::sync::Arc;
+use veil_crypto::{
+    encrypt, hash, tokenize, EncryptionConfig, HashConfig, InMemoryVault, TokenConfig, TokenVault,
+};
 
 fn generate_test_data(size: usize) -> Vec<u8> {
     (0..size).map(|i| (i % 256) as u8).collect()
@@ -55,7 +58,7 @@ fn bench_hashing(c: &mut Criterion) {
 }
 
 fn bench_tokenization(c: &mut Criterion) {
-    let vault = TokenVault::new();
+    let vault: Arc<dyn TokenVault> = Arc::new(InMemoryVault::new());
     let config = TokenConfig::new();
 
     c.bench_function("tokenize_short_string", |b| {
@@ -63,7 +66,7 @@ fn bench_tokenization(c: &mut Criterion) {
             tokenize(
                 black_box("test@example.com"),
                 black_box(&config),
-                black_box(&vault),
+                black_box(Arc::clone(&vault)),
             )
         })
     });
@@ -73,7 +76,7 @@ fn bench_tokenization(c: &mut Criterion) {
             tokenize(
                 black_box("4111111111111111"),
                 black_box(&config),
-                black_box(&vault),
+                black_box(Arc::clone(&vault)),
             )
         })
     });

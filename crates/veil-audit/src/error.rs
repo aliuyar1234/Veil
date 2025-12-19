@@ -33,4 +33,8 @@ pub enum AuditError {
         /// Actual key length provided.
         actual: usize,
     },
+
+    /// Encryption feature is disabled.
+    #[error("Encryption is disabled; enable the `encryption` feature to use encrypted audit logs")]
+    EncryptionUnavailable,
 }

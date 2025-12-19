@@ -23,6 +23,10 @@ pub const MIN_CONFIDENCE_THRESHOLD: f64 = 0.5;
 /// Default confidence threshold for PII detection (0-1 scale).
 pub const DEFAULT_CONFIDENCE_THRESHOLD: f64 = 0.8;
 
+const _: () = assert!(MIN_CONFIDENCE_THRESHOLD < DEFAULT_CONFIDENCE_THRESHOLD);
+const _: () = assert!(MIN_CONFIDENCE_THRESHOLD >= 0.0);
+const _: () = assert!(DEFAULT_CONFIDENCE_THRESHOLD <= 1.0);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -32,12 +36,5 @@ mod tests {
         assert_eq!(DEFAULT_MAX_FILE_SIZE, 104_857_600);
         assert_eq!(DEFAULT_SAMPLE_SIZE, 102_400);
         assert_eq!(HEADER_BUFFER_SIZE, 1024);
-    }
-
-    #[test]
-    fn test_confidence_thresholds() {
-        assert!(MIN_CONFIDENCE_THRESHOLD < DEFAULT_CONFIDENCE_THRESHOLD);
-        assert!(MIN_CONFIDENCE_THRESHOLD >= 0.0);
-        assert!(DEFAULT_CONFIDENCE_THRESHOLD <= 1.0);
     }
 }

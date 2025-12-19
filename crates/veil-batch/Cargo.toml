@@ -21,9 +21,6 @@ zip = { workspace = true }
 # Parallelism
 rayon = { workspace = true }
 
-# Progress
-indicatif = { workspace = true }
-
 # Logging
 tracing = { workspace = true }
 

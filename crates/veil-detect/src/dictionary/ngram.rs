@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_build_index() {
-        let terms = vec!["hello", "world", "help"];
+        let terms = ["hello", "world", "help"];
         let index = NgramIndex::build(terms.iter().copied());
 
         assert_eq!(index.term_count(), 3);
@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn test_find_candidates_exact() {
-        let terms = vec!["hello", "world", "help", "held"];
+        let terms = ["hello", "world", "help", "held"];
         let index = NgramIndex::build(terms.iter().copied());
 
         // "hello" should match "hello"
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn test_find_candidates_similar() {
-        let terms = vec!["hello", "world", "hallo", "held"];
+        let terms = ["hello", "world", "hallo", "held"];
         let index = NgramIndex::build(terms.iter().copied());
 
         // "hallo" should match both "hello" and "hallo" due to shared ngrams
@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_find_candidates_no_match() {
-        let terms = vec!["hello", "world"];
+        let terms = ["hello", "world"];
         let index = NgramIndex::build(terms.iter().copied());
 
         // "xyz" has no shared ngrams
@@ -238,7 +238,7 @@ mod tests {
 
     #[test]
     fn test_find_candidates_with_threshold() {
-        let terms = vec!["hello", "hallo", "help", "world"];
+        let terms = ["hello", "hallo", "help", "world"];
         let index = NgramIndex::build(terms.iter().copied());
 
         // With high overlap requirement, should find fewer matches

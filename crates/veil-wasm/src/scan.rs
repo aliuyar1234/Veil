@@ -4,6 +4,7 @@ use crate::error::WasmError;
 use crate::types::{Finding, ScanOptions, ScanResult, ScanStats};
 use crate::utils::{report_progress, validate_format, validate_size};
 use wasm_bindgen::prelude::*;
+use web_time::Instant;
 
 /// Internal scan implementation.
 pub fn scan_impl(data: &[u8], options: JsValue) -> Result<JsValue, JsValue> {
@@ -23,7 +24,7 @@ pub fn scan_impl(data: &[u8], options: JsValue) -> Result<JsValue, JsValue> {
     let format = validate_format(options.filename.as_deref()).map_err(|e| e.to_js_value())?;
 
     // Perform scan
-    let start_time = instant::Instant::now();
+    let start_time = Instant::now();
     let result = perform_scan(data, format, &options).map_err(|e| e.to_js_value())?;
     let duration_ms = start_time.elapsed().as_millis() as u64;
 
@@ -65,7 +66,7 @@ pub fn scan_with_progress_impl(
     report_progress(on_progress, 0);
 
     // Perform scan with progress
-    let start_time = instant::Instant::now();
+    let start_time = Instant::now();
 
     // Parse phase (0-30%)
     report_progress(on_progress, 10);

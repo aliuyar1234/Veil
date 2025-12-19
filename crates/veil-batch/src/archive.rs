@@ -1,6 +1,7 @@
 //! ZIP archive processing.
 
 use crate::error::{BatchError, BatchResult};
+use crate::redact::redact_text;
 use crate::types::{BatchOptions, FileEntry};
 use std::fs::File;
 use std::io::Read;
@@ -138,7 +139,8 @@ pub fn process_archive(
         if size > options.max_file_size as u64 {
             eprintln!(
                 "Warning: Skipping large file in archive: {} ({} bytes)",
-                file_name, size
+                redact_text(&file_name),
+                size
             );
             continue;
         }

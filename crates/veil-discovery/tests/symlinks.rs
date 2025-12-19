@@ -1,15 +1,12 @@
 //! Integration tests for symlink handling in discovery.
 
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::Write;
 use tempfile::TempDir;
 use veil_discovery::{DiscoveryOptions, Scanner};
 
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
-
-#[cfg(windows)]
-use std::os::windows::fs::symlink_file;
 
 fn create_test_file(dir: &TempDir, name: &str, content: &str) -> std::path::PathBuf {
     let path = dir.path().join(name);
@@ -76,7 +73,7 @@ fn test_symlink_to_directory() {
 
     // Create a subdirectory with PII files
     let subdir = temp_dir.path().join("subdir");
-    fs::create_dir(&subdir).unwrap();
+    std::fs::create_dir(&subdir).unwrap();
     let _file = {
         let path = subdir.join("data.txt");
         let mut file = File::create(&path).unwrap();

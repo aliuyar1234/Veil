@@ -11,6 +11,8 @@ categories = ["text-processing"]
 veil-detect = { path = "../veil-detect" }
 serde.workspace = true
 thiserror.workspace = true
+sha2.workspace = true
+hex.workspace = true
 
 [dev-dependencies]
 pretty_assertions.workspace = true

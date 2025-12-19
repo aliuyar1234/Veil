@@ -31,7 +31,7 @@ impl Default for StreamConfig {
             max_buffer_size: 65536,
             mode: ProcessingMode::LineByLine,
             categories: Vec::new(),
-            include_content: true,
+            include_content: false,
         }
     }
 }
@@ -198,7 +198,7 @@ mod tests {
         assert_eq!(config.chunk_size, 8192);
         assert_eq!(config.max_buffer_size, 65536);
         assert_eq!(config.mode, ProcessingMode::LineByLine);
-        assert!(config.include_content);
+        assert!(!config.include_content);
     }
 
     #[test]

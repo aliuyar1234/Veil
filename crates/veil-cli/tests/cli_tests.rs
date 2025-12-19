@@ -1,5 +1,6 @@
 //! CLI integration tests for the Veil tool.
 
+use assert_cmd::cargo::cargo_bin_cmd;
 use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
@@ -7,7 +8,7 @@ use tempfile::TempDir;
 
 /// Get the CLI binary.
 fn veil_cmd() -> Command {
-    Command::cargo_bin("veil").unwrap()
+    cargo_bin_cmd!("veil")
 }
 
 // ============== Help & Version Tests ==============

@@ -92,7 +92,7 @@ proptest! {
     #[test]
     fn email_domain_contains_dot_if_valid(s in ".*") {
         if is_valid_email_format(&s) {
-            let domain = s.split('@').last().unwrap();
+            let domain = s.split('@').next_back().unwrap();
             prop_assert!(domain.contains('.'),
                 "Valid email domain must contain dot: {}", s);
         }

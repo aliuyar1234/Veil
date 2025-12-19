@@ -1,6 +1,7 @@
 //! File discovery and format detection.
 
 use crate::error::BatchResult;
+use crate::redact::{redact_path, redact_text};
 use crate::types::{BatchOptions, FileEntry};
 use std::fs;
 use std::io::Read;
@@ -58,7 +59,10 @@ fn walk_directory(path: &Path, options: &BatchOptions) -> BatchResult<Vec<FileEn
             Ok(e) => e,
             Err(e) => {
                 // Log error but continue processing
-                eprintln!("Warning: Failed to access path: {}", e);
+                eprintln!(
+                    "Warning: Failed to access path: {}",
+                    redact_text(&e.to_string())
+                );
                 continue;
             }
         };
@@ -73,9 +77,9 @@ fn walk_directory(path: &Path, options: &BatchOptions) -> BatchResult<Vec<FileEn
             Ok(m) => m,
             Err(e) => {
                 eprintln!(
-                    "Warning: Failed to get metadata for {:?}: {}",
-                    entry.path(),
-                    e
+                    "Warning: Failed to get metadata for {}: {}",
+                    redact_path(entry.path()),
+                    redact_text(&e.to_string())
                 );
                 continue;
             }

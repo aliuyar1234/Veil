@@ -25,14 +25,12 @@ veil-stream = { path = "../veil-stream" }
 veil-crypto = { path = "../veil-crypto" }
 serde.workspace = true
 serde_json.workspace = true
+csv.workspace = true
 thiserror.workspace = true
 miette.workspace = true
 clap.workspace = true
-indicatif.workspace = true
-console.workspace = true
 rand.workspace = true
 base64.workspace = true
-atty.workspace = true
 
 [dev-dependencies]
 pretty_assertions.workspace = true

@@ -1,7 +1,7 @@
 //! Scan command implementation.
 
 use std::fs::{self, File};
-use std::io::{Cursor, Read};
+use std::io::{Cursor, IsTerminal, Read};
 use std::path::Path;
 
 use miette::{IntoDiagnostic, Result};
@@ -33,7 +33,7 @@ pub fn run(args: ScanArgs, quiet: bool, json: bool) -> Result<()> {
                 eprintln!("Warning: Including PII values in output (--yes flag used)");
             }
             true
-        } else if atty::is(atty::Stream::Stdin) {
+        } else if std::io::stdin().is_terminal() {
             // Interactive mode: prompt for confirmation
             eprintln!("WARNING: Including PII values exposes sensitive data in output.");
             eprintln!("This may be captured in logs, terminal history, or other systems.");

@@ -76,6 +76,7 @@ mod filter;
 mod parallel;
 mod processor;
 mod progress;
+mod redact;
 mod streaming;
 mod types;
 

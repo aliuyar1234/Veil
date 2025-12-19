@@ -408,17 +408,22 @@ impl<K: KeyProvider> TokenVault for EncryptedVault<K> {
     }
 }
 
-// Ensure thread safety
-unsafe impl<K: KeyProvider> Send for EncryptedVault<K> {}
-unsafe impl<K: KeyProvider> Sync for EncryptedVault<K> {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::key_provider::LocalKeyProvider;
+    use std::sync::Once;
     use tempfile::TempDir;
 
+    fn allow_plaintext_storage() {
+        static INIT: Once = Once::new();
+        INIT.call_once(|| {
+            std::env::set_var("VEIL_ALLOW_PLAINTEXT_STORAGE", "1");
+        });
+    }
+
     fn setup_vault() -> (TempDir, EncryptedVault<LocalKeyProvider>) {
+        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
         let vault_path = temp_dir.path().join("vault.enc");
@@ -443,6 +448,7 @@ mod tests {
 
     #[test]
     fn test_persistence() {
+        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
         let vault_path = temp_dir.path().join("vault.enc");
@@ -500,6 +506,7 @@ mod tests {
 
     #[test]
     fn test_key_rotation() {
+        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
         let vault_path = temp_dir.path().join("vault.enc");
@@ -547,6 +554,7 @@ mod tests {
 
     #[test]
     fn test_wrong_key_fails() {
+        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
         let vault_path = temp_dir.path().join("vault.enc");

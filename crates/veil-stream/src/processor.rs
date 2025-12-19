@@ -14,7 +14,6 @@ use crate::types::{ProcessingMode, StreamConfig, StreamEvent, StreamResult};
 /// and chunk-by-chunk processing modes.
 pub struct StreamProcessor {
     config: StreamConfig,
-    #[allow(dead_code)] // Used indirectly via detect_in_text
     registry: DetectorRegistry,
 }
 
@@ -312,9 +311,19 @@ impl StreamProcessor {
 
     /// Detect PII in text using the configured registry.
     fn detect_in_text(&self, text: &str) -> Vec<Finding> {
-        use veil_detect::detect_in_text;
+        use veil_parsers::Position;
+        use veil_parsers::TextSegment;
 
-        let findings = detect_in_text(text);
+        let segment = TextSegment {
+            content: text.to_string().into(),
+            position: Position::Text {
+                line: 1,
+                column: 1,
+                byte_offset: 0,
+                byte_length: text.len(),
+            },
+        };
+        let findings = self.registry.detect_all(&[segment]);
 
         // Filter by configured categories if specified
         if self.config.categories.is_empty() {

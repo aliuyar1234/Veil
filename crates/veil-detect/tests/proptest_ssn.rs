@@ -36,9 +36,9 @@ fn is_valid_ssn_format(s: &str) -> bool {
 // Strategy to generate valid SSN formats
 fn valid_ssn_strategy() -> impl Strategy<Value = String> {
     (
-        001u32..666,    // area (excluding 666)
-        01u32..100,     // group
-        0001u32..10000, // serial
+        1u32..666,   // area (excluding 666)
+        1u32..100,   // group
+        1u32..10000, // serial
     )
         .prop_filter("Exclude 666 area code", |(area, _, _)| *area != 666)
         .prop_map(|(area, group, serial)| format!("{:03}-{:02}-{:04}", area, group, serial))
@@ -52,14 +52,12 @@ fn invalid_ssn_strategy() -> impl Strategy<Value = String> {
         // Area 666
         Just("666-12-3456".to_string()),
         // Area 900+
-        (900u32..1000, 01u32..100, 0001u32..10000)
+        (900u32..1000, 1u32..100, 1u32..10000)
             .prop_map(|(area, group, serial)| format!("{:03}-{:02}-{:04}", area, group, serial)),
         // Group 00
-        (001u32..666, 0001u32..10000)
-            .prop_map(|(area, serial)| format!("{:03}-00-{:04}", area, serial)),
+        (1u32..666, 1u32..10000).prop_map(|(area, serial)| format!("{:03}-00-{:04}", area, serial)),
         // Serial 0000
-        (001u32..666, 01u32..100)
-            .prop_map(|(area, group)| format!("{:03}-{:02}-0000", area, group)),
+        (1u32..666, 1u32..100).prop_map(|(area, group)| format!("{:03}-{:02}-0000", area, group)),
     ]
 }
 

@@ -81,9 +81,22 @@ impl RedactionEngine {
             let original_start = finding.start;
             let original_end = finding.end;
 
-            // Calculate new positions with offset
-            let adjusted_start = (original_start as i64 + offset) as usize;
-            let adjusted_end = (original_end as i64 + offset) as usize;
+            // Calculate new positions with offset (using saturating arithmetic to prevent overflow)
+            let adjusted_start = if offset >= 0 {
+                original_start.saturating_add(offset as usize)
+            } else {
+                original_start.saturating_sub((-offset) as usize)
+            };
+            let adjusted_end = if offset >= 0 {
+                original_end.saturating_add(offset as usize)
+            } else {
+                original_end.saturating_sub((-offset) as usize)
+            };
+
+            // Bounds check to prevent panic on replace_range
+            if adjusted_start > result_text.len() || adjusted_end > result_text.len() {
+                continue; // Skip this finding if positions are out of bounds
+            }
 
             // Apply replacement
             result_text.replace_range(adjusted_start..adjusted_end, &replacement);

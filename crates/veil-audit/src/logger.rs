@@ -61,10 +61,14 @@ impl AuditLogger {
         let log_file = self.get_log_file_path(entry.timestamp.date_naive());
 
         // Append to file
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_file)?;
+        let mut options = OpenOptions::new();
+        options.create(true).append(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options.open(&log_file)?;
 
         let json = serde_json::to_string(&entry)?;
         writeln!(file, "{}", json)?;

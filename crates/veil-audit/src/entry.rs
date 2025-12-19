@@ -67,13 +67,56 @@ impl AuditOutcome {
     }
 
     /// Create a failed outcome.
+    ///
+    /// # Security
+    ///
+    /// Error messages are automatically sanitized to prevent PII leakage.
+    /// Sensitive patterns (emails, paths with usernames, etc.) are redacted.
     pub fn failure(error: impl Into<String>) -> Self {
         Self {
             success: false,
-            error: Some(error.into()),
+            error: Some(Self::sanitize_error(error.into())),
             findings: None,
             redactions: None,
         }
+    }
+
+    /// Sanitize error messages to prevent PII leakage in audit logs.
+    ///
+    /// This function redacts:
+    /// - Email addresses
+    /// - File paths that might contain usernames
+    /// - Credit card-like numbers
+    /// - SSN-like patterns
+    fn sanitize_error(error: String) -> String {
+        use regex::Regex;
+        use std::sync::LazyLock;
+
+        // Patterns that might contain PII
+        static EMAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}").unwrap()
+        });
+        static PATH_USER_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"(?i)(/home/|/users/|\\users\\|C:\\Users\\)[^/\\]+").unwrap()
+        });
+        static CREDIT_CARD_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b").unwrap());
+        static SSN_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"\b\d{3}-\d{2}-\d{4}\b").unwrap());
+
+        let mut result = error;
+        result = EMAIL_RE
+            .replace_all(&result, "[EMAIL REDACTED]")
+            .to_string();
+        result = PATH_USER_RE
+            .replace_all(&result, "$1[USER REDACTED]")
+            .to_string();
+        result = CREDIT_CARD_RE
+            .replace_all(&result, "[CARD REDACTED]")
+            .to_string();
+        result = SSN_RE.replace_all(&result, "[SSN REDACTED]").to_string();
+
+        result
     }
 
     /// Add findings summary.

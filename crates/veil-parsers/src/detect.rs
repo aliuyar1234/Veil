@@ -5,30 +5,57 @@ use crate::types::FileFormat;
 /// Detect the format of file content.
 ///
 /// Uses a combination of:
-/// 1. File extension (if provided)
-/// 2. Content analysis (magic bytes, structure)
+/// 1. Content analysis (magic bytes, structure) - PRIMARY
+/// 2. File extension as fallback hint
+///
+/// # Security
+///
+/// Content-based detection takes priority over file extensions to prevent
+/// format confusion attacks where a malicious file has a misleading extension.
 pub fn detect_format(bytes: &[u8], filename: Option<&str>) -> FileFormat {
-    // First, check extension if filename provided
+    // Security: Always try content-based detection first
+    // This prevents format confusion attacks where extension doesn't match content
+    let content_format = detect_format_from_content(bytes);
+
+    // If content detection found a specific format (not just Text), trust it
+    if content_format != FileFormat::Text {
+        return content_format;
+    }
+
+    // For text-like content, use extension as a hint
     if let Some(name) = filename {
         if let Some(ext) = name.rsplit('.').next() {
             match ext.to_lowercase().as_str() {
-                "csv" | "tsv" => return FileFormat::Csv,
-                "json" => return FileFormat::Json,
-                "html" | "htm" => return FileFormat::Html,
-                "pdf" => return FileFormat::Pdf,
+                // Only trust extension for ambiguous text formats
+                "csv" | "tsv" => {
+                    // Verify it actually looks like CSV
+                    if looks_like_csv(bytes) {
+                        return FileFormat::Csv;
+                    }
+                }
+                "json" => {
+                    // Verify it starts with { or [
+                    let trimmed = bytes
+                        .iter()
+                        .position(|&b| !b.is_ascii_whitespace())
+                        .map(|pos| &bytes[pos..])
+                        .unwrap_or(&[]);
+                    if !trimmed.is_empty() && (trimmed[0] == b'{' || trimmed[0] == b'[') {
+                        return FileFormat::Json;
+                    }
+                }
+                "html" | "htm" => {
+                    // Already checked in content detection
+                }
                 "txt" | "log" | "md" => return FileFormat::Text,
-                "docx" => return FileFormat::Docx,
-                "xlsx" => return FileFormat::Xlsx,
-                "pptx" => return FileFormat::Pptx,
-                "eml" => return FileFormat::Eml,
-                "msg" => return FileFormat::Msg,
+                // Binary formats must be detected by content, not extension
+                // This prevents malicious files from being processed incorrectly
                 _ => {}
             }
         }
     }
 
-    // Content-based detection
-    detect_format_from_content(bytes)
+    content_format
 }
 
 /// Detect format from content alone.
@@ -250,14 +277,50 @@ mod tests {
 
     #[test]
     fn test_detect_by_extension() {
+        // Security: Content detection now takes priority over extension
+        // Extension is only used as a hint for ambiguous text formats
+
+        // JSON: Extension + valid JSON-like content required
         assert_eq!(
-            detect_format(b"content", Some("file.json")),
+            detect_format(b"{\"key\": \"value\"}", Some("file.json")),
             FileFormat::Json
         );
-        assert_eq!(detect_format(b"content", Some("file.csv")), FileFormat::Csv);
+        // JSON extension with non-JSON content should NOT trust extension alone
         assert_eq!(
-            detect_format(b"content", Some("file.html")),
+            detect_format(b"plain text content", Some("file.json")),
+            FileFormat::Text
+        );
+
+        // CSV: Extension + CSV-like content required
+        assert_eq!(
+            detect_format(b"a,b,c\n1,2,3", Some("file.csv")),
+            FileFormat::Csv
+        );
+
+        // HTML: Detected by content magic bytes
+        assert_eq!(
+            detect_format(b"<html><body>", Some("file.html")),
             FileFormat::Html
         );
+
+        // TXT: Extension trusted for explicit text files
+        assert_eq!(
+            detect_format(b"content", Some("file.txt")),
+            FileFormat::Text
+        );
+    }
+
+    #[test]
+    fn test_content_priority_over_extension() {
+        // Security: Content detection should override misleading extensions
+
+        // PDF content with wrong extension should still detect as PDF
+        assert_eq!(
+            detect_format(b"%PDF-1.4 test content", Some("fake.txt")),
+            FileFormat::Pdf
+        );
+
+        // JSON content without extension should detect as JSON
+        assert_eq!(detect_format(b"{\"data\": 123}", None), FileFormat::Json);
     }
 }

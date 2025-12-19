@@ -136,12 +136,16 @@ pub struct AddressDetector {
 }
 
 // Lazy-compiled regex patterns for address detection
+// Security: Bounded quantifiers to prevent ReDoS attacks
+// Changed `(?:\s+[A-Za-z]+)*` to `(?:\s+[A-Za-z]+){0,5}` to limit backtracking
 static US_STREET_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\b\d{1,5}\s+(?:[NSEW]\.?\s+)?[A-Za-z]+(?:\s+[A-Za-z]+)*\s+(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Boulevard|Blvd\.?|Drive|Dr\.?|Lane|Ln\.?|Way|Court|Ct\.?|Place|Pl\.?|Circle|Cir\.?)\b").unwrap()
+    Regex::new(r"(?i)\b\d{1,5}\s+(?:[NSEW]\.?\s+)?[A-Za-z]+(?:\s+[A-Za-z]+){0,5}\s+(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Boulevard|Blvd\.?|Drive|Dr\.?|Lane|Ln\.?|Way|Court|Ct\.?|Place|Pl\.?|Circle|Cir\.?)\b").unwrap()
 });
 
+// Security: Bounded quantifiers to prevent ReDoS attacks
 static US_CITY_STATE_ZIP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\b([A-Za-z]+(?:\s+[A-Za-z]+)*),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)\b").unwrap()
+    Regex::new(r"(?i)\b([A-Za-z]+(?:\s+[A-Za-z]+){0,4}),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)\b")
+        .unwrap()
 });
 
 #[allow(dead_code)]
@@ -152,16 +156,19 @@ static DE_STREET_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b[A-Za-zäöüßÄÖÜ]+(?:straße|str\.?|weg|platz|allee|gasse|ring|damm)\s+\d{1,5}[a-z]?\b").unwrap()
 });
 
+// Security: Bounded quantifiers to prevent ReDoS attacks
 static DE_PLZ_CITY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\b(\d{5})\s+([A-Za-zäöüßÄÖÜ]+(?:\s+[A-Za-zäöüßÄÖÜ]+)*)\b").unwrap()
+    Regex::new(r"\b(\d{5})\s+([A-Za-zäöüßÄÖÜ]+(?:\s+[A-Za-zäöüßÄÖÜ]+){0,4})\b").unwrap()
 });
 
+// Security: Bounded quantifiers to prevent ReDoS attacks
 static FR_STREET_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\b\d{1,5}(?:,?\s+(?:bis|ter))?\s+(?:rue|avenue|av\.?|boulevard|bd\.?|place|pl\.?|allée|impasse|chemin|passage)\s+[A-Za-zéèêëàâäùûüôöîïç]+(?:\s+[A-Za-zéèêëàâäùûüôöîïç]+)*\b").unwrap()
+    Regex::new(r"(?i)\b\d{1,5}(?:,?\s+(?:bis|ter))?\s+(?:rue|avenue|av\.?|boulevard|bd\.?|place|pl\.?|allée|impasse|chemin|passage)\s+[A-Za-zéèêëàâäùûüôöîïç]+(?:\s+[A-Za-zéèêëàâäùûüôöîïç]+){0,5}\b").unwrap()
 });
 
+// Security: Bounded quantifiers to prevent ReDoS attacks
 static FR_CP_CITY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\b(\d{5})\s+([A-Za-zéèêëàâäùûüôöîïç]+(?:[- ][A-Za-zéèêëàâäùûüôöîïç]+)*)\b")
+    Regex::new(r"\b(\d{5})\s+([A-Za-zéèêëàâäùûüôöîïç]+(?:[- ][A-Za-zéèêëàâäùûüôöîïç]+){0,4})\b")
         .unwrap()
 });
 

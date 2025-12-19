@@ -18,11 +18,39 @@ use aes_gcm::aead::generic_array::GenericArray;
 use rand::{thread_rng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
-use std::sync::RwLock;
+use std::path::{Path, PathBuf};
+use std::sync::{OnceLock, RwLock};
 use zeroize::{Zeroize, ZeroizeOnDrop};
+
+const PLAINTEXT_STORAGE_ENV: &str = "VEIL_ALLOW_PLAINTEXT_STORAGE";
+
+fn plaintext_storage_allowed() -> bool {
+    static ALLOW: OnceLock<bool> = OnceLock::new();
+    *ALLOW.get_or_init(|| {
+        std::env::var(PLAINTEXT_STORAGE_ENV)
+            .ok()
+            .map(|value| {
+                let normalized = value.trim().to_ascii_lowercase();
+                normalized == "1" || normalized == "true" || normalized == "yes"
+            })
+            .unwrap_or(false)
+    })
+}
+
+fn create_secure_file(path: &Path) -> Result<File, CryptoError> {
+    let mut options = OpenOptions::new();
+    options.create(true).write(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options
+        .open(path)
+        .map_err(|e| CryptoError::KeyManagement(format!("Failed to create file: {}", e)))
+}
 
 /// A 256-bit secret key with automatic zeroization on drop.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
@@ -131,6 +159,7 @@ struct KeyEntry {
 ///
 /// # Security Considerations
 /// - Keys are stored unencrypted; use filesystem permissions for protection
+/// - Disabled by default; set `VEIL_ALLOW_PLAINTEXT_STORAGE=1` to enable
 /// - Suitable for development and single-node deployments
 /// - For production, consider using a KMS-backed provider
 #[derive(Debug)]
@@ -148,6 +177,10 @@ impl LocalKeyProvider {
     /// If the file exists, loads existing keys. Otherwise creates a new file.
     pub fn new(path: impl Into<PathBuf>) -> Result<Self, CryptoError> {
         let path = path.into();
+
+        if !plaintext_storage_allowed() {
+            return Err(CryptoError::PlaintextStorageDisabled);
+        }
 
         // Create parent directory if needed
         if let Some(parent) = path.parent() {
@@ -206,9 +239,7 @@ impl LocalKeyProvider {
             .map_err(|e| CryptoError::KeyManagement(e.to_string()))?;
 
         let temp_path = self.path.with_extension("tmp");
-        let mut file = File::create(&temp_path).map_err(|e| {
-            CryptoError::KeyManagement(format!("Failed to create temp file: {}", e))
-        })?;
+        let mut file = create_secure_file(&temp_path)?;
 
         for entry in keys.values() {
             let json = serde_json::to_string(entry)
@@ -394,7 +425,15 @@ impl KeyProvider for EnvKeyProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Once;
     use tempfile::TempDir;
+
+    fn allow_plaintext_storage() {
+        static INIT: Once = Once::new();
+        INIT.call_once(|| {
+            std::env::set_var(PLAINTEXT_STORAGE_ENV, "1");
+        });
+    }
 
     #[test]
     fn test_secret_key_generate() {
@@ -415,6 +454,7 @@ mod tests {
 
     #[test]
     fn test_local_key_provider_create_and_get() {
+        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
 
@@ -431,6 +471,7 @@ mod tests {
 
     #[test]
     fn test_local_key_provider_persistence() {
+        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
 
@@ -453,6 +494,7 @@ mod tests {
 
     #[test]
     fn test_local_key_provider_rotation() {
+        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
 
@@ -471,6 +513,7 @@ mod tests {
 
     #[test]
     fn test_local_key_provider_list_keys() {
+        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
 
@@ -488,6 +531,7 @@ mod tests {
 
     #[test]
     fn test_local_key_provider_key_not_found() {
+        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
 

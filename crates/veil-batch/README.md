@@ -178,7 +178,6 @@ The crate is organized into focused modules:
 - `rayon`: Work-stealing parallelism
 - `glob`: Shell-style pattern matching
 - `infer`: Magic byte file type detection
-- `indicatif`: Progress bars (re-exported from workspace)
 - `veil-parsers`: Document parsing (local crate)
 
 ## License

@@ -5,6 +5,7 @@ use crate::types::{ProtectOptions, ProtectResult, ProtectStats, ProtectStyle};
 use crate::utils::{report_progress, validate_format, validate_size};
 use veil_redact::RedactionStyle;
 use wasm_bindgen::prelude::*;
+use web_time::Instant;
 
 /// Internal protect implementation.
 pub fn protect_impl(data: &[u8], options: JsValue) -> Result<JsValue, JsValue> {
@@ -24,7 +25,7 @@ pub fn protect_impl(data: &[u8], options: JsValue) -> Result<JsValue, JsValue> {
     let format = validate_format(options.filename.as_deref()).map_err(|e| e.to_js_value())?;
 
     // Perform protection
-    let start_time = instant::Instant::now();
+    let start_time = Instant::now();
     let (protected_data, protected_categories, replacements) =
         perform_protect(data, format, &options).map_err(|e| e.to_js_value())?;
     let duration_ms = start_time.elapsed().as_millis() as u64;
@@ -63,7 +64,7 @@ pub fn protect_with_progress_impl(
     report_progress(on_progress, 0);
 
     // Perform protection with progress
-    let start_time = instant::Instant::now();
+    let start_time = Instant::now();
 
     // Scan phase (0-50%)
     report_progress(on_progress, 25);

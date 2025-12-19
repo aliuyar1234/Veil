@@ -49,6 +49,8 @@ impl EncryptionConfig {
 ///
 /// Each log entry is encrypted with AES-256-GCM before being written to disk.
 /// The logger maintains the hash chain by computing checksums before encryption.
+///
+/// Note: Requires the `encryption` feature; otherwise `new` returns an error.
 pub struct EncryptedAuditLogger {
     log_dir: PathBuf,
     config: EncryptionConfig,
@@ -62,6 +64,10 @@ impl EncryptedAuditLogger {
     /// * `log_dir` - Directory for encrypted log files
     /// * `config` - Encryption configuration with AES key
     pub fn new(log_dir: impl Into<PathBuf>, config: EncryptionConfig) -> Result<Self, AuditError> {
+        if !cfg!(feature = "encryption") {
+            let _ = config;
+            return Err(AuditError::EncryptionUnavailable);
+        }
         let log_dir = log_dir.into();
 
         // Create directory if it doesn't exist
@@ -97,10 +103,14 @@ impl EncryptedAuditLogger {
         let log_file = self.get_log_file_path(entry.timestamp.date_naive());
 
         // Append encrypted entry
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_file)?;
+        let mut options = OpenOptions::new();
+        options.create(true).append(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options.open(&log_file)?;
 
         writeln!(file, "{}", encrypted)?;
 
@@ -237,8 +247,8 @@ fn encrypt_string(plaintext: &str, config: &EncryptionConfig) -> Result<String, 
     #[cfg(not(feature = "encryption"))]
     {
         let _ = config;
-        // When encryption feature is disabled, store as base64 (not secure, just for format compatibility)
-        Ok(base64_encode(plaintext.as_bytes()))
+        let _ = plaintext;
+        Err(AuditError::EncryptionUnavailable)
     }
 }
 
@@ -265,85 +275,12 @@ fn decrypt_string(ciphertext: &str, config: &EncryptionConfig) -> Result<String,
     #[cfg(not(feature = "encryption"))]
     {
         let _ = config;
-        // When encryption feature is disabled, decode base64
-        let bytes = base64_decode(ciphertext)?;
-        String::from_utf8(bytes)
-            .map_err(|e| AuditError::Io(std::io::Error::other(format!("Invalid UTF-8: {}", e))))
+        let _ = ciphertext;
+        Err(AuditError::EncryptionUnavailable)
     }
 }
 
-#[cfg(not(feature = "encryption"))]
-fn base64_encode(data: &[u8]) -> String {
-    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    let mut result = String::new();
-    for chunk in data.chunks(3) {
-        let b0 = chunk[0] as usize;
-        let b1 = chunk.get(1).copied().unwrap_or(0) as usize;
-        let b2 = chunk.get(2).copied().unwrap_or(0) as usize;
-
-        result.push(ALPHABET[(b0 >> 2) & 0x3F] as char);
-        result.push(ALPHABET[((b0 << 4) | (b1 >> 4)) & 0x3F] as char);
-
-        if chunk.len() > 1 {
-            result.push(ALPHABET[((b1 << 2) | (b2 >> 6)) & 0x3F] as char);
-        } else {
-            result.push('=');
-        }
-
-        if chunk.len() > 2 {
-            result.push(ALPHABET[b2 & 0x3F] as char);
-        } else {
-            result.push('=');
-        }
-    }
-    result
-}
-
-#[cfg(not(feature = "encryption"))]
-fn base64_decode(data: &str) -> Result<Vec<u8>, AuditError> {
-    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    let mut result = Vec::new();
-    let bytes: Vec<u8> = data.bytes().filter(|&b| b != b'=').collect();
-
-    for chunk in bytes.chunks(4) {
-        if chunk.len() < 2 {
-            break;
-        }
-
-        let decode = |b: u8| -> Result<u8, AuditError> {
-            ALPHABET
-                .iter()
-                .position(|&x| x == b)
-                .map(|p| p as u8)
-                .ok_or_else(|| {
-                    AuditError::Io(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "Invalid base64",
-                    ))
-                })
-        };
-
-        let b0 = decode(chunk[0])?;
-        let b1 = decode(chunk[1])?;
-        result.push((b0 << 2) | (b1 >> 4));
-
-        if chunk.len() > 2 {
-            let b2 = decode(chunk[2])?;
-            result.push((b1 << 4) | (b2 >> 2));
-
-            if chunk.len() > 3 {
-                let b3 = decode(chunk[3])?;
-                result.push((b2 << 6) | b3);
-            }
-        }
-    }
-
-    Ok(result)
-}
-
-#[cfg(test)]
+#[cfg(all(test, feature = "encryption"))]
 mod tests {
     use super::*;
     use crate::entry::{AuditOutcome, AuditParameters};
@@ -511,5 +448,19 @@ mod tests {
         };
         let entries = logger.query(&filter).unwrap();
         assert_eq!(entries.len(), 2);
+    }
+}
+
+#[cfg(all(test, not(feature = "encryption")))]
+mod tests_no_encryption {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_encrypted_logger_requires_feature() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = EncryptionConfig::new(vec![0u8; 32]).unwrap();
+        let result = EncryptedAuditLogger::new(temp_dir.path(), config);
+        assert!(matches!(result, Err(AuditError::EncryptionUnavailable)));
     }
 }

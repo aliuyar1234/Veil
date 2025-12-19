@@ -29,9 +29,8 @@ use zeroize::Zeroize;
 /// # Security Note
 ///
 /// The `Debug` implementation intentionally redacts the contents to prevent
-/// accidental PII leakage in logs or debug output.
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(transparent)]
+/// accidental PII leakage in logs, debug output, or serialization.
+#[derive(Clone)]
 pub struct SensitiveString(String);
 
 impl SensitiveString {
@@ -68,6 +67,26 @@ impl SensitiveString {
     /// Get a reference to the inner string.
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl Serialize for SensitiveString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Redact on serialization to avoid accidental PII leakage.
+        serializer.serialize_str(&format!("[REDACTED {} bytes]", self.0.len()))
+    }
+}
+
+impl<'de> Deserialize<'de> for SensitiveString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(SensitiveString::new(value))
     }
 }
 
@@ -249,10 +268,11 @@ mod tests {
 
         // Serialize
         let json = serde_json::to_string(&sensitive).unwrap();
-        assert_eq!(json, "\"test-value\"");
+        assert!(!json.contains("test-value"));
+        assert!(json.contains("REDACTED"));
 
-        // Deserialize
-        let deserialized: SensitiveString = serde_json::from_str(&json).unwrap();
+        // Deserialize from explicit string
+        let deserialized: SensitiveString = serde_json::from_str("\"test-value\"").unwrap();
         assert_eq!(deserialized.as_str(), "test-value");
     }
 

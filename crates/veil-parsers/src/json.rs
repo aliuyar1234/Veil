@@ -55,8 +55,31 @@ impl Default for JsonParser {
     }
 }
 
+/// Maximum recursion depth for JSON parsing to prevent stack overflow.
+const MAX_JSON_DEPTH: usize = 128;
+
 /// Recursively extract string values with their JSON paths.
+///
+/// # Security
+///
+/// Recursion depth is limited to `MAX_JSON_DEPTH` (128) to prevent
+/// stack overflow attacks from maliciously crafted deeply nested JSON.
 fn extract_strings(value: &Value, path: &str, results: &mut Vec<TextSegment>) {
+    extract_strings_with_depth(value, path, results, 0);
+}
+
+/// Internal recursive function with depth tracking.
+fn extract_strings_with_depth(
+    value: &Value,
+    path: &str,
+    results: &mut Vec<TextSegment>,
+    depth: usize,
+) {
+    // Security: Prevent stack overflow from deeply nested JSON
+    if depth > MAX_JSON_DEPTH {
+        return;
+    }
+
     match value {
         Value::String(s) => {
             results.push(TextSegment {
@@ -69,13 +92,13 @@ fn extract_strings(value: &Value, path: &str, results: &mut Vec<TextSegment>) {
         Value::Object(map) => {
             for (key, val) in map {
                 let new_path = format!("{}.{}", path, key);
-                extract_strings(val, &new_path, results);
+                extract_strings_with_depth(val, &new_path, results, depth + 1);
             }
         }
         Value::Array(arr) => {
             for (idx, val) in arr.iter().enumerate() {
                 let new_path = format!("{}[{}]", path, idx);
-                extract_strings(val, &new_path, results);
+                extract_strings_with_depth(val, &new_path, results, depth + 1);
             }
         }
         // Skip numbers, booleans, nulls

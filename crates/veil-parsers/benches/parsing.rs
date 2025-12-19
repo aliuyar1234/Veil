@@ -6,7 +6,7 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use veil_parsers::{parse_bytes, FileFormat, ParseOptions};
 
 fn generate_text_content(lines: usize) -> Vec<u8> {
-    let sample_lines = vec![
+    let sample_lines = [
         "This is a sample line of text for benchmarking purposes.",
         "It contains various words, numbers like 12345, and punctuation.",
         "Email addresses like test@example.com might appear here.",

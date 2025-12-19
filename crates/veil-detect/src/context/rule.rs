@@ -96,12 +96,96 @@ impl ContextRule {
         self
     }
 
+    /// Maximum allowed regex pattern length to prevent ReDoS attacks.
+    const MAX_PATTERN_LENGTH: usize = 1000;
+
     /// Compile the regex pattern.
+    ///
+    /// # Security
+    ///
+    /// This method includes ReDoS protection:
+    /// - Pattern length is limited to prevent extremely long patterns
+    /// - Nested quantifiers are detected and rejected
     pub fn compile(&mut self) -> Result<(), regex::Error> {
         if self.compiled.is_none() {
+            // Security: Limit pattern length to prevent ReDoS
+            if self.pattern.len() > Self::MAX_PATTERN_LENGTH {
+                return Err(regex::Error::Syntax(format!(
+                    "Pattern too long: {} bytes (max {})",
+                    self.pattern.len(),
+                    Self::MAX_PATTERN_LENGTH
+                )));
+            }
+
+            // Security: Check for potentially dangerous nested quantifiers
+            if Self::has_nested_quantifiers(&self.pattern) {
+                return Err(regex::Error::Syntax(
+                    "Pattern contains nested quantifiers which may cause ReDoS".to_string(),
+                ));
+            }
+
             self.compiled = Some(Regex::new(&self.pattern)?);
         }
         Ok(())
+    }
+
+    /// Check if pattern contains dangerous nested quantifiers that could cause ReDoS.
+    ///
+    /// Detects patterns like: (a+)+, (a*)+, (a+)*, (?:a+)+, etc.
+    fn has_nested_quantifiers(pattern: &str) -> bool {
+        // Simple heuristic: look for quantifier followed by group with quantifier
+        // This catches patterns like: (a+)+, (.*)+, (?:x+)*, etc.
+        let dangerous_patterns = [
+            r"(\+|\*|\?|\})\s*\)", // quantifier before closing paren
+        ];
+
+        let bytes = pattern.as_bytes();
+        let mut paren_depth = 0;
+        let mut has_quantifier_in_group = false;
+
+        for (i, &b) in bytes.iter().enumerate() {
+            match b {
+                b'(' => {
+                    paren_depth += 1;
+                    has_quantifier_in_group = false;
+                }
+                b')' => {
+                    if paren_depth > 0 {
+                        paren_depth -= 1;
+                        // Check if next char is a quantifier
+                        if has_quantifier_in_group {
+                            if let Some(&next) = bytes.get(i + 1) {
+                                if next == b'+' || next == b'*' || next == b'{' {
+                                    return true; // Nested quantifier detected
+                                }
+                            }
+                        }
+                    }
+                }
+                b'+' | b'*' => {
+                    if paren_depth > 0 {
+                        // Check if previous char was not escaped
+                        let prev = if i > 0 { bytes.get(i - 1) } else { None };
+                        if prev != Some(&b'\\') {
+                            has_quantifier_in_group = true;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Also check for some known dangerous patterns
+        for pattern_check in dangerous_patterns {
+            if regex::Regex::new(pattern_check)
+                .map(|re| re.is_match(pattern))
+                .unwrap_or(false)
+            {
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Get the compiled regex, compiling if necessary.

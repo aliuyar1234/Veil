@@ -34,11 +34,15 @@ fn intl_phone_strategy() -> impl Strategy<Value = String> {
 fn non_phone_strategy() -> impl Strategy<Value = String> {
     prop_oneof![
         // Too short
-        "[0-9]{1,5}",
+        "[0-9]{1,9}",
+        // Too long
+        "[0-9]{16,25}",
         // Letters
-        "[a-z]{10,15}",
-        // Mixed
-        "[a-z0-9]{15,20}",
+        "[a-z]{10,20}",
+        // Short digits with letters
+        ("[0-9]{1,9}", "[a-z]{1,5}").prop_map(|(digits, suffix)| format!("{}{}", digits, suffix)),
+        // Long digits with letters
+        ("[a-z]{1,5}", "[0-9]{16,25}").prop_map(|(prefix, digits)| format!("{}{}", prefix, digits)),
     ]
 }
 
@@ -81,5 +85,11 @@ proptest! {
     fn all_letters_not_phone(s in "[a-z]{10,20}") {
         prop_assert!(!is_valid_phone_format(&s),
             "Letters should not be valid phone: {}", s);
+    }
+
+    #[test]
+    fn non_phone_strings_fail_format_check(s in non_phone_strategy()) {
+        prop_assert!(!is_valid_phone_format(&s),
+            "Non-phone string should fail format check: {}", s);
     }
 }

@@ -6,6 +6,7 @@ use crate::error::BatchResult;
 use crate::filter::{apply_filter, GlobFilter};
 use crate::parallel::process_files_parallel;
 use crate::progress::ProgressTracker;
+use crate::redact::{redact_path, redact_text};
 use crate::streaming::process_streaming;
 use crate::types::{
     BatchJob, BatchProgress, BatchResult as BatchResultType, BatchSummary, FileEntry, FileError,
@@ -65,10 +66,7 @@ impl DefaultBatchProcessor {
 
     /// Discover and filter files for processing.
     /// Returns (file_entries, archive_errors) tuple.
-    fn discover_and_filter(
-        &self,
-        job: &BatchJob,
-    ) -> BatchResult<(Vec<FileEntry>, Vec<FileError>)> {
+    fn discover_and_filter(&self, job: &BatchJob) -> BatchResult<(Vec<FileEntry>, Vec<FileError>)> {
         // Discover all files
         let mut entries = discover_files(&job.sources, &job.options)?;
 
@@ -80,7 +78,11 @@ impl DefaultBatchProcessor {
                 match archive::process_archive(&entry.path, &job.options, 0) {
                     Ok(mut ae) => archive_entries.append(&mut ae),
                     Err(e) => {
-                        tracing::warn!("Failed to process archive {:?}: {}", entry.path, e);
+                        tracing::warn!(
+                            "Failed to process archive {}: {}",
+                            redact_path(&entry.path),
+                            redact_text(&e.to_string())
+                        );
                         archive_errors.push(FileError {
                             path: entry.path.clone(),
                             error: format!("Archive processing failed: {}", e),
@@ -97,8 +99,7 @@ impl DefaultBatchProcessor {
         entries.retain(|entry| is_supported_format(entry.format));
 
         // Apply glob filters
-        let filter =
-            GlobFilter::new(&job.options.include_patterns, &job.options.exclude_patterns)?;
+        let filter = GlobFilter::new(&job.options.include_patterns, &job.options.exclude_patterns)?;
         let filtered = apply_filter(entries, &filter, |e| &e.path);
 
         Ok((filtered, archive_errors))
@@ -183,7 +184,11 @@ impl BatchProcessor for DefaultBatchProcessor {
 
         // Log archive errors (streaming mode doesn't collect errors, just counts)
         for err in &archive_errors {
-            tracing::warn!("Archive error: {} - {}", err.path.display(), err.error);
+            tracing::warn!(
+                "Archive error: {} - {}",
+                redact_path(&err.path),
+                redact_text(&err.error)
+            );
         }
 
         // Process with streaming - note: archive errors are logged but not included in summary

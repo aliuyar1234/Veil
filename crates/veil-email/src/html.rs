@@ -11,7 +11,7 @@ use html2text::from_read;
 /// - Preserves line breaks and paragraph structure
 pub fn convert_html_to_text(html: &str) -> String {
     // Use html2text with a reasonable width
-    let text = from_read(html.as_bytes(), 80);
+    let text = from_read(html.as_bytes(), 80).unwrap_or_else(|_| html.to_string());
 
     // Clean up excessive whitespace
     clean_whitespace(&text)

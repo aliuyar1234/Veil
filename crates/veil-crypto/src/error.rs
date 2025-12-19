@@ -55,6 +55,10 @@ pub enum CryptoError {
     #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
 
+    /// Plaintext key storage is disabled.
+    #[error("Plaintext key storage is disabled; set VEIL_ALLOW_PLAINTEXT_STORAGE=1 to enable")]
+    PlaintextStorageDisabled,
+
     /// Key not found in provider.
     #[error("Key not found: {0}")]
     KeyNotFound(String),
@@ -78,4 +82,8 @@ pub enum VaultError {
     /// Token already exists.
     #[error("Token already exists: {0}")]
     Duplicate(String),
+
+    /// Plaintext vault storage is disabled.
+    #[error("Plaintext vault storage is disabled; set VEIL_ALLOW_PLAINTEXT_STORAGE=1 to enable")]
+    PlaintextStorageDisabled,
 }

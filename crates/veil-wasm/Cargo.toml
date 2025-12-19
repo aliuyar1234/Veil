@@ -29,7 +29,7 @@ web-sys.workspace = true
 serde-wasm-bindgen.workspace = true
 
 # WASM-compatible time
-instant = { version = "0.1", features = ["wasm-bindgen"] }
+web-time = "1.1"
 
 # WASM random support (needed for transitive dependencies)
 getrandom.workspace = true
