@@ -46,6 +46,7 @@ pub mod error;
 pub mod metadata;
 pub mod security;
 pub mod utils;
+mod warnings;
 
 // Format-specific modules
 pub mod docx;
@@ -59,8 +60,8 @@ pub use metadata::OfficeMetadata;
 pub use security::{detect_legacy_format, validate_archive, SecurityLimits};
 pub use xlsx::{parse_xlsx_large, parse_xlsx_streaming, StreamingConfig, StreamingStats};
 
-// Re-export veil-parsers types for convenience
-pub use veil_parsers::{ParseResult, Position, TextSegment};
+// Re-export shared types for convenience
+pub use veil_types::{ParseResult, Position, TextSegment};
 
 use std::io::{BufRead, Read, Seek};
 

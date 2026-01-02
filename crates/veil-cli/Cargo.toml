@@ -24,6 +24,7 @@ veil-discovery = { path = "../veil-discovery", version = "0.1.0" }
 veil-stream = { path = "../veil-stream", version = "0.1.0" }
 veil-crypto = { path = "../veil-crypto", version = "0.1.0" }
 veil-core = { path = "../veil-core", version = "0.1.0" }
+veil-fs = { path = "../veil-fs", version = "0.1.0" }
 serde.workspace = true
 serde_json.workspace = true
 csv.workspace = true

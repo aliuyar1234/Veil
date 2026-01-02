@@ -48,6 +48,18 @@ jobs:
       - name: Wait for crates.io
         run: sleep 30
 
+      - name: Publish veil-types
+        run: cargo publish -p veil-types --locked
+
+      - name: Wait for crates.io
+        run: sleep 30
+
+      - name: Publish veil-fs
+        run: cargo publish -p veil-fs --locked
+
+      - name: Wait for crates.io
+        run: sleep 30
+
       - name: Publish veil-parsers
         run: cargo publish -p veil-parsers --locked
 

@@ -10,7 +10,7 @@ use std::time::Instant;
 use calamine::{open_workbook_auto_from_rs, Reader as CalamineReader, Sheets};
 
 use crate::error::Result;
-use veil_parsers::{DocumentMetadata, FileFormat, ParseResult, Position, TextSegment};
+use veil_types::{DocumentMetadata, FileFormat, ParseResult, Position, TextSegment};
 
 use super::cell_ref::CellReference;
 use super::parser::cell_to_string;
@@ -177,8 +177,8 @@ pub fn parse_xlsx_large<R: Read + Seek + BufRead + Clone>(
     })?;
 
     if stats.truncated {
-        warnings.push(veil_parsers::ParseWarning {
-            code: veil_parsers::WarningCode::Truncated,
+        warnings.push(veil_types::ParseWarning {
+            code: veil_types::WarningCode::Truncated,
             message: stats
                 .truncation_reason
                 .clone()

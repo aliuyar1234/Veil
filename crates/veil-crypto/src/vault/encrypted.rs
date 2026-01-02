@@ -70,8 +70,9 @@ struct VaultFile {
 /// ```rust,ignore
 /// use veil_crypto::vault::EncryptedVault;
 /// use veil_crypto::key_provider::LocalKeyProvider;
+/// use veil_crypto::PlaintextStoragePolicy;
 ///
-/// let key_provider = LocalKeyProvider::new("keys.jsonl")?;
+/// let key_provider = LocalKeyProvider::new("keys.jsonl", PlaintextStoragePolicy::allow_insecure())?;
 /// // Initialize the key first
 /// key_provider.rotate_key("vault-key")?;
 ///
@@ -115,9 +116,8 @@ impl<K: KeyProvider> EncryptedVault<K> {
         // Create parent directory if needed
         if let Some(parent) = path.parent() {
             if !parent.exists() {
-                fs::create_dir_all(parent).map_err(|e| {
-                    VaultError::Storage(format!("Failed to create directory: {}", e))
-                })?;
+                fs::create_dir_all(parent)
+                    .map_err(|e| VaultError::io("create vault directory", parent, e))?;
             }
         }
 
@@ -159,10 +159,9 @@ impl<K: KeyProvider> EncryptedVault<K> {
         };
 
         let json = serde_json::to_string(&vault_file)
-            .map_err(|e| VaultError::Storage(format!("Failed to serialize vault: {}", e)))?;
+            .map_err(|e| VaultError::json("serialize vault", e))?;
 
-        fs::write(&path, json)
-            .map_err(|e| VaultError::Storage(format!("Failed to write vault: {}", e)))?;
+        fs::write(&path, json).map_err(|e| VaultError::io("write vault file", &path, e))?;
 
         Ok(Self {
             path,
@@ -176,15 +175,15 @@ impl<K: KeyProvider> EncryptedVault<K> {
 
     /// Open an existing encrypted vault.
     fn open(path: PathBuf, key_provider: K, key_id: String) -> Result<Self, VaultError> {
-        let mut file = File::open(&path)
-            .map_err(|e| VaultError::Storage(format!("Failed to open vault: {}", e)))?;
+        let mut file =
+            File::open(&path).map_err(|e| VaultError::io("open vault file", &path, e))?;
 
         let mut contents = String::new();
         file.read_to_string(&mut contents)
-            .map_err(|e| VaultError::Storage(format!("Failed to read vault: {}", e)))?;
+            .map_err(|e| VaultError::io("read vault file", &path, e))?;
 
-        let vault_file: VaultFile = serde_json::from_str(&contents)
-            .map_err(|e| VaultError::Storage(format!("Invalid vault format: {}", e)))?;
+        let vault_file: VaultFile =
+            serde_json::from_str(&contents).map_err(|e| VaultError::json("parse vault file", e))?;
 
         if vault_file.version != VAULT_VERSION {
             return Err(VaultError::Storage(format!(
@@ -226,7 +225,7 @@ impl<K: KeyProvider> EncryptedVault<K> {
                 .map_err(|e| VaultError::Storage(format!("Failed to decrypt entry: {}", e)))?;
 
             let pt_entry: PlaintextEntry = serde_json::from_slice(&plaintext)
-                .map_err(|e| VaultError::Storage(format!("Invalid entry format: {}", e)))?;
+                .map_err(|e| VaultError::json("parse vault entry", e))?;
 
             tokens.insert(pt_entry.token.clone(), pt_entry.original.clone());
             reverse.insert(pt_entry.original, pt_entry.token);
@@ -247,11 +246,11 @@ impl<K: KeyProvider> EncryptedVault<K> {
         let dek = self
             .dek
             .read()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire DEK read lock"))?;
         let tokens = self
             .tokens
             .read()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire tokens read lock"))?;
 
         // Encrypt DEK
         let kek = self
@@ -279,7 +278,7 @@ impl<K: KeyProvider> EncryptedVault<K> {
             };
 
             let plaintext = serde_json::to_vec(&pt_entry)
-                .map_err(|e| VaultError::Storage(format!("Failed to serialize entry: {}", e)))?;
+                .map_err(|e| VaultError::json("serialize vault entry", e))?;
 
             let mut nonce_bytes = [0u8; NONCE_SIZE];
             thread_rng().fill_bytes(&mut nonce_bytes);
@@ -304,15 +303,15 @@ impl<K: KeyProvider> EncryptedVault<K> {
         };
 
         let json = serde_json::to_string(&vault_file)
-            .map_err(|e| VaultError::Storage(format!("Failed to serialize vault: {}", e)))?;
+            .map_err(|e| VaultError::json("serialize vault", e))?;
 
         // Write atomically via temp file
         let temp_path = self.path.with_extension("tmp");
         fs::write(&temp_path, &json)
-            .map_err(|e| VaultError::Storage(format!("Failed to write temp file: {}", e)))?;
+            .map_err(|e| VaultError::io("write temp vault file", &temp_path, e))?;
 
         fs::rename(&temp_path, &self.path)
-            .map_err(|e| VaultError::Storage(format!("Failed to save vault: {}", e)))?;
+            .map_err(|e| VaultError::io("save vault file", &self.path, e))?;
 
         Ok(())
     }
@@ -347,12 +346,12 @@ impl<K: KeyProvider> TokenVault for EncryptedVault<K> {
         let mut tokens = self
             .tokens
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire tokens write lock"))?;
 
         let mut reverse = self
             .reverse
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire reverse write lock"))?;
 
         if tokens.contains_key(token) {
             return Err(VaultError::Duplicate(token.to_string()));
@@ -371,7 +370,7 @@ impl<K: KeyProvider> TokenVault for EncryptedVault<K> {
         let tokens = self
             .tokens
             .read()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire tokens read lock"))?;
 
         Ok(tokens.get(token).cloned())
     }
@@ -380,12 +379,12 @@ impl<K: KeyProvider> TokenVault for EncryptedVault<K> {
         let mut tokens = self
             .tokens
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire tokens write lock"))?;
 
         let mut reverse = self
             .reverse
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire reverse write lock"))?;
 
         if let Some(original) = tokens.remove(token) {
             reverse.remove(&original);
@@ -402,7 +401,7 @@ impl<K: KeyProvider> TokenVault for EncryptedVault<K> {
         let reverse = self
             .reverse
             .read()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire reverse read lock"))?;
 
         Ok(reverse.get(original).cloned())
     }
@@ -412,23 +411,16 @@ impl<K: KeyProvider> TokenVault for EncryptedVault<K> {
 mod tests {
     use super::*;
     use crate::key_provider::LocalKeyProvider;
-    use std::sync::Once;
+    use crate::PlaintextStoragePolicy;
     use tempfile::TempDir;
 
-    fn allow_plaintext_storage() {
-        static INIT: Once = Once::new();
-        INIT.call_once(|| {
-            std::env::set_var("VEIL_ALLOW_PLAINTEXT_STORAGE", "1");
-        });
-    }
-
     fn setup_vault() -> (TempDir, EncryptedVault<LocalKeyProvider>) {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
         let vault_path = temp_dir.path().join("vault.enc");
 
-        let key_provider = LocalKeyProvider::new(&key_path).unwrap();
+        let key_provider =
+            LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
         // Create the initial key
         key_provider.rotate_key("test-key").unwrap();
 
@@ -448,14 +440,14 @@ mod tests {
 
     #[test]
     fn test_persistence() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
         let vault_path = temp_dir.path().join("vault.enc");
 
         // Create and store
         {
-            let key_provider = LocalKeyProvider::new(&key_path).unwrap();
+            let key_provider =
+                LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             key_provider.rotate_key("persist-key").unwrap();
 
             let vault = EncryptedVault::new(&vault_path, key_provider, "persist-key").unwrap();
@@ -464,7 +456,8 @@ mod tests {
 
         // Reopen and verify
         {
-            let key_provider = LocalKeyProvider::new(&key_path).unwrap();
+            let key_provider =
+                LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             let vault = EncryptedVault::new(&vault_path, key_provider, "persist-key").unwrap();
 
             let result = vault.lookup("tok_persist").unwrap();
@@ -506,14 +499,14 @@ mod tests {
 
     #[test]
     fn test_key_rotation() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
         let vault_path = temp_dir.path().join("vault.enc");
 
         // Create vault and store data
         {
-            let key_provider = LocalKeyProvider::new(&key_path).unwrap();
+            let key_provider =
+                LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             key_provider.rotate_key("rotate-key").unwrap();
 
             let vault = EncryptedVault::new(&vault_path, key_provider, "rotate-key").unwrap();
@@ -524,7 +517,8 @@ mod tests {
 
         // Reopen and verify both entries still accessible
         {
-            let key_provider = LocalKeyProvider::new(&key_path).unwrap();
+            let key_provider =
+                LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             let vault = EncryptedVault::new(&vault_path, key_provider, "rotate-key").unwrap();
 
             assert_eq!(
@@ -554,14 +548,14 @@ mod tests {
 
     #[test]
     fn test_wrong_key_fails() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
         let vault_path = temp_dir.path().join("vault.enc");
 
         // Create vault with one key
         {
-            let key_provider = LocalKeyProvider::new(&key_path).unwrap();
+            let key_provider =
+                LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             key_provider.rotate_key("key1").unwrap();
 
             let vault = EncryptedVault::new(&vault_path, key_provider, "key1").unwrap();
@@ -570,7 +564,8 @@ mod tests {
 
         // Try to open with different key
         {
-            let key_provider = LocalKeyProvider::new(&key_path).unwrap();
+            let key_provider =
+                LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             key_provider.rotate_key("key2").unwrap();
 
             let result = EncryptedVault::new(&vault_path, key_provider, "key2");

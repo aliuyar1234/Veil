@@ -1,8 +1,6 @@
 //! Conversion utilities for veil-parsers integration.
 
-use veil_parsers::{
-    DocumentMetadata, FileFormat, ParseResult, ParseWarning, Position, TextSegment,
-};
+use veil_types::{DocumentMetadata, FileFormat, ParseResult, ParseWarning, Position, TextSegment};
 
 use crate::types::{EmailBodyPart, EmailHeader, EmailHeaderValue, EmailMessage};
 

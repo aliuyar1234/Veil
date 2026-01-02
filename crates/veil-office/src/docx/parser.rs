@@ -10,7 +10,9 @@ use zip::ZipArchive;
 use crate::error::{OfficeError, Result};
 use crate::metadata::{parse_app_xml, parse_core_xml, OfficeMetadata};
 use crate::security::{is_encrypted, validate_archive, SecurityLimits};
-use veil_parsers::{DocumentMetadata, FileFormat, ParseResult, Position, TableCell, TextSegment};
+use veil_types::{
+    DocumentMetadata, FileFormat, ParseResult, ParseWarning, Position, TableCell, TextSegment,
+};
 
 /// Document section types in Word documents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,6 +70,7 @@ pub fn parse_docx<R: Read + Seek>(reader: R) -> Result<ParseResult> {
 
     let mut segments = Vec::new();
     let mut total_chars = 0;
+    let mut warnings = Vec::new();
 
     // Extract main document content
     let (doc_segments, chars) = extract_document_xml(&mut archive)?;
@@ -78,9 +81,12 @@ pub fn parse_docx<R: Read + Seek>(reader: R) -> Result<ParseResult> {
     for i in 1..=3 {
         // Word typically has up to 3 headers
         let header_name = format!("word/header{}.xml", i);
-        if let Ok((header_segments, chars)) =
-            extract_header_footer_xml(&mut archive, &header_name, DocxSection::Header)
-        {
+        if let Ok((header_segments, chars)) = extract_header_footer_xml(
+            &mut archive,
+            &header_name,
+            DocxSection::Header,
+            &mut warnings,
+        ) {
             segments.extend(header_segments);
             total_chars += chars;
         }
@@ -89,16 +95,19 @@ pub fn parse_docx<R: Read + Seek>(reader: R) -> Result<ParseResult> {
     // Extract footers
     for i in 1..=3 {
         let footer_name = format!("word/footer{}.xml", i);
-        if let Ok((footer_segments, chars)) =
-            extract_header_footer_xml(&mut archive, &footer_name, DocxSection::Footer)
-        {
+        if let Ok((footer_segments, chars)) = extract_header_footer_xml(
+            &mut archive,
+            &footer_name,
+            DocxSection::Footer,
+            &mut warnings,
+        ) {
             segments.extend(footer_segments);
             total_chars += chars;
         }
     }
 
     // Extract metadata
-    let metadata = extract_metadata(&mut archive);
+    let metadata = extract_metadata(&mut archive, &mut warnings);
 
     // Add metadata as segments
     if let Some(meta) = metadata {
@@ -120,7 +129,7 @@ pub fn parse_docx<R: Read + Seek>(reader: R) -> Result<ParseResult> {
             encoding_lossy: false,
         },
         segments,
-        warnings: Vec::new(),
+        warnings,
         total_chars,
         duration_ms,
     })
@@ -243,6 +252,7 @@ fn extract_header_footer_xml<R: Read + Seek>(
     archive: &mut ZipArchive<R>,
     path: &str,
     section: DocxSection,
+    warnings: &mut Vec<ParseWarning>,
 ) -> Result<(Vec<TextSegment>, usize)> {
     let file = match archive.by_name(path) {
         Ok(f) => f,
@@ -295,7 +305,10 @@ fn extract_header_footer_xml<R: Read + Seek>(
                 }
             }
             Ok(Event::Eof) => break,
-            Err(_) => break,
+            Err(_) => {
+                warnings.push(crate::warnings::xml_parse_warning(path));
+                break;
+            }
             _ => {}
         }
         buf.clear();
@@ -305,17 +318,27 @@ fn extract_header_footer_xml<R: Read + Seek>(
 }
 
 /// Extract metadata from docProps files.
-fn extract_metadata<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Option<OfficeMetadata> {
+fn extract_metadata<R: Read + Seek>(
+    archive: &mut ZipArchive<R>,
+    warnings: &mut Vec<ParseWarning>,
+) -> Option<OfficeMetadata> {
     let mut metadata = OfficeMetadata::new();
 
     // Parse core.xml
     if let Ok(file) = archive.by_name("docProps/core.xml") {
-        metadata = parse_core_xml(std::io::BufReader::new(file));
+        let (parsed, mut parsed_warnings) =
+            parse_core_xml("docProps/core.xml", std::io::BufReader::new(file));
+        metadata = parsed;
+        warnings.append(&mut parsed_warnings);
     }
 
     // Parse app.xml
     if let Ok(file) = archive.by_name("docProps/app.xml") {
-        parse_app_xml(std::io::BufReader::new(file), &mut metadata);
+        warnings.extend(parse_app_xml(
+            "docProps/app.xml",
+            std::io::BufReader::new(file),
+            &mut metadata,
+        ));
     }
 
     if metadata.is_empty() {

@@ -28,7 +28,7 @@ pub use error::DetectError;
 pub use finding::{Finding, ValidationStatus};
 pub use registry::DetectorRegistry;
 
-use veil_parsers::TextSegment;
+use veil_types::TextSegment;
 
 /// Detect PII in text segments using the given registry.
 pub fn detect_pii(segments: &[TextSegment], registry: &DetectorRegistry) -> Vec<Finding> {
@@ -39,7 +39,7 @@ pub fn detect_pii(segments: &[TextSegment], registry: &DetectorRegistry) -> Vec<
 pub fn detect_in_text(text: &str) -> Vec<Finding> {
     let segment = TextSegment {
         content: text.to_string().into(),
-        position: veil_parsers::Position::Text {
+        position: veil_types::Position::Text {
             line: 1,
             column: 1,
             byte_offset: 0,

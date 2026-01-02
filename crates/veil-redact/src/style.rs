@@ -8,7 +8,7 @@ use crate::mask::MaskingRule;
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RedactionStyle {
-    /// Replace with category label: [EMAIL], [IBAN]
+    /// Replace with category label: `[EMAIL]`, `[IBAN]`
     #[default]
     Label,
 

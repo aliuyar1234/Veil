@@ -10,7 +10,9 @@ mod logger;
 mod operation;
 mod summary;
 
-pub use checksum::{calculate_checksum, verify_chain};
+pub use checksum::{
+    calculate_checksum, verify_chain, verify_chain_from_env, verify_chain_with_key,
+};
 pub use encrypted::{EncryptedAuditLogger, EncryptionConfig};
 pub use entry::{AuditEntry, AuditOutcome, AuditParameters};
 pub use error::AuditError;

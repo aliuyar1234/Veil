@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use crate::category::PiiCategory;
 
@@ -86,148 +87,68 @@ pub struct TableDetector {
     header_mappings: HashMap<String, (PiiCategory, f32)>,
 }
 
+#[derive(Debug, Deserialize)]
+struct HeaderMappingFile {
+    mappings: Vec<HeaderMappingEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct HeaderMappingEntry {
+    header: String,
+    category: String,
+    boost: f32,
+}
+
+static DEFAULT_HEADER_MAPPINGS: LazyLock<HashMap<String, (PiiCategory, f32)>> =
+    LazyLock::new(|| {
+        let file: HeaderMappingFile =
+            serde_yaml::from_str(include_str!("table_header_mappings.yaml"))
+                .expect("Invalid embedded table header mappings YAML");
+
+        file.mappings
+            .into_iter()
+            .filter_map(|entry| {
+                let category = parse_mapping_category(&entry.category)?;
+                Some((
+                    normalize_header_name(&entry.header),
+                    (category, entry.boost),
+                ))
+            })
+            .collect()
+    });
+
+fn normalize_header_name(header: &str) -> String {
+    header.trim().to_lowercase().replace([' ', '-'], "_")
+}
+
+fn parse_mapping_category(category: &str) -> Option<PiiCategory> {
+    let category = category.trim();
+    if let Some(custom) = category.strip_prefix("custom:") {
+        return Some(PiiCategory::Custom(custom.trim().to_string()));
+    }
+
+    match category {
+        "email" => Some(PiiCategory::Email),
+        "phone" => Some(PiiCategory::Phone),
+        "credit_card" => Some(PiiCategory::CreditCard),
+        "ipv4" => Some(PiiCategory::Ipv4),
+        _ => None,
+    }
+}
+
 impl TableDetector {
     /// Create a new table detector with default header mappings.
     pub fn new() -> Self {
-        let mut mappings = HashMap::new();
-
-        // Email headers
-        for name in &[
-            "email",
-            "e-mail",
-            "email_address",
-            "emailaddress",
-            "mail",
-            "correo",
-        ] {
-            mappings.insert(name.to_string(), (PiiCategory::Email, 0.4));
-        }
-
-        // Phone headers
-        for name in &[
-            "phone",
-            "telephone",
-            "tel",
-            "mobile",
-            "cell",
-            "phone_number",
-            "phonenumber",
-            "telefon",
-            "téléphone",
-        ] {
-            mappings.insert(name.to_string(), (PiiCategory::Phone, 0.4));
-        }
-
-        // Name headers (use Custom for PersonName)
-        for name in &[
-            "name",
-            "full_name",
-            "fullname",
-            "customer_name",
-            "customername",
-            "first_name",
-            "firstname",
-            "last_name",
-            "lastname",
-            "nom",
-            "prénom",
-            "vorname",
-            "nachname",
-        ] {
-            mappings.insert(
-                name.to_string(),
-                (PiiCategory::Custom("PersonName".to_string()), 0.35),
-            );
-        }
-
-        // SSN headers
-        for name in &[
-            "ssn",
-            "social_security",
-            "socialsecurity",
-            "ss_number",
-            "ssnumber",
-        ] {
-            mappings.insert(
-                name.to_string(),
-                (PiiCategory::Custom("SSN".to_string()), 0.5),
-            );
-        }
-
-        // Credit card headers
-        for name in &[
-            "credit_card",
-            "creditcard",
-            "card_number",
-            "cardnumber",
-            "cc_number",
-            "ccnumber",
-            "payment_card",
-        ] {
-            mappings.insert(name.to_string(), (PiiCategory::CreditCard, 0.5));
-        }
-
-        // Address headers
-        for name in &[
-            "address",
-            "street",
-            "street_address",
-            "streetaddress",
-            "addr",
-            "adresse",
-            "anschrift",
-        ] {
-            mappings.insert(
-                name.to_string(),
-                (PiiCategory::Custom("Address".to_string()), 0.35),
-            );
-        }
-
-        // IP address headers
-        for name in &[
-            "ip",
-            "ip_address",
-            "ipaddress",
-            "client_ip",
-            "clientip",
-            "source_ip",
-            "sourceip",
-        ] {
-            mappings.insert(name.to_string(), (PiiCategory::Ipv4, 0.4));
-        }
-
-        // ID headers (generic, lower boost since "ID" is ambiguous)
-        for name in &["id", "user_id", "userid", "customer_id", "customerid"] {
-            mappings.insert(
-                name.to_string(),
-                (PiiCategory::Custom("ID".to_string()), 0.15),
-            );
-        }
-
-        // Date of birth
-        for name in &[
-            "dob",
-            "date_of_birth",
-            "dateofbirth",
-            "birthdate",
-            "birth_date",
-            "geburtsdatum",
-        ] {
-            mappings.insert(
-                name.to_string(),
-                (PiiCategory::Custom("DateOfBirth".to_string()), 0.35),
-            );
-        }
-
         Self {
-            header_mappings: mappings,
+            header_mappings: DEFAULT_HEADER_MAPPINGS.clone(),
         }
     }
 
     /// Add a custom header mapping.
     pub fn add_mapping(&mut self, header: impl Into<String>, category: PiiCategory, boost: f32) {
+        let header = header.into();
         self.header_mappings
-            .insert(header.into().to_lowercase(), (category, boost));
+            .insert(normalize_header_name(&header), (category, boost));
     }
 
     /// Detect table structure in text.
@@ -291,7 +212,7 @@ impl TableDetector {
         // Build header mappings
         let mut current_pos = 0;
         for (idx, col_name) in columns.iter().enumerate() {
-            let normalized = col_name.to_lowercase().replace([' ', '-'], "_");
+            let normalized = normalize_header_name(col_name);
 
             // Find position in original text
             let col_start = first_line[current_pos..]
@@ -304,17 +225,13 @@ impl TableDetector {
             let (inferred_category, boost) = self
                 .header_mappings
                 .get(&normalized)
-                .cloned()
-                .unwrap_or((PiiCategory::Custom("Unknown".to_string()), 0.0));
+                .map(|(category, boost)| (Some(category.clone()), *boost))
+                .unwrap_or((None, 0.0));
 
             // Only add header if we have a meaningful mapping
             let header = TableHeader {
                 name: col_name.to_string(),
-                inferred_category: if boost > 0.0 {
-                    Some(inferred_category)
-                } else {
-                    None
-                },
+                inferred_category,
                 column_index: idx,
                 boost,
                 start: col_start,

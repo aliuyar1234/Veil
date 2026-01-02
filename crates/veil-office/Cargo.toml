@@ -18,8 +18,8 @@ calamine = { workspace = true }
 zip = { workspace = true }
 quick-xml = { workspace = true }
 
-# Re-export veil-parsers types
-veil-parsers = { path = "../veil-parsers", version = "0.1.0" }
+# Shared parse result types
+veil-types = { path = "../veil-types", version = "0.1.0" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

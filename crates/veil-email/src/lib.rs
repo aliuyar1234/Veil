@@ -38,7 +38,7 @@ pub use types::{
     EmailMessage, EmailParseOptions,
 };
 
-use veil_parsers::{FileFormat, ParseResult};
+use veil_types::{FileFormat, ParseResult};
 
 /// Parse an email from bytes.
 ///

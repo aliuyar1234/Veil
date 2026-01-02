@@ -13,6 +13,7 @@
 //! ```
 
 use crate::error::CryptoError;
+use crate::PlaintextStoragePolicy;
 use aes_gcm::aead::generic_array::typenum::U32;
 use aes_gcm::aead::generic_array::GenericArray;
 use rand::{thread_rng, RngCore};
@@ -21,23 +22,8 @@ use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{OnceLock, RwLock};
+use std::sync::RwLock;
 use zeroize::{Zeroize, ZeroizeOnDrop};
-
-const PLAINTEXT_STORAGE_ENV: &str = "VEIL_ALLOW_PLAINTEXT_STORAGE";
-
-fn plaintext_storage_allowed() -> bool {
-    static ALLOW: OnceLock<bool> = OnceLock::new();
-    *ALLOW.get_or_init(|| {
-        std::env::var(PLAINTEXT_STORAGE_ENV)
-            .ok()
-            .map(|value| {
-                let normalized = value.trim().to_ascii_lowercase();
-                normalized == "1" || normalized == "true" || normalized == "yes"
-            })
-            .unwrap_or(false)
-    })
-}
 
 fn create_secure_file(path: &Path) -> Result<File, CryptoError> {
     let mut options = OpenOptions::new();
@@ -159,7 +145,7 @@ struct KeyEntry {
 ///
 /// # Security Considerations
 /// - Keys are stored unencrypted; use filesystem permissions for protection
-/// - Disabled by default; set `VEIL_ALLOW_PLAINTEXT_STORAGE=1` to enable
+/// - Disabled by default; pass `PlaintextStoragePolicy::allow_insecure()` (or use `new_from_env`)
 /// - Suitable for development and single-node deployments
 /// - For production, consider using a KMS-backed provider
 pub struct LocalKeyProvider {
@@ -184,10 +170,13 @@ impl LocalKeyProvider {
     /// * `path` - Path to the key storage file
     ///
     /// If the file exists, loads existing keys. Otherwise creates a new file.
-    pub fn new(path: impl Into<PathBuf>) -> Result<Self, CryptoError> {
+    pub fn new(
+        path: impl Into<PathBuf>,
+        storage_policy: PlaintextStoragePolicy,
+    ) -> Result<Self, CryptoError> {
         let path = path.into();
 
-        if !plaintext_storage_allowed() {
+        if !storage_policy.is_allowed() {
             return Err(CryptoError::PlaintextStorageDisabled);
         }
 
@@ -207,6 +196,11 @@ impl LocalKeyProvider {
 
         provider.load()?;
         Ok(provider)
+    }
+
+    /// Create a new local key provider using `VEIL_ALLOW_PLAINTEXT_STORAGE`.
+    pub fn new_from_env(path: impl Into<PathBuf>) -> Result<Self, CryptoError> {
+        Self::new(path, PlaintextStoragePolicy::from_env())
     }
 
     /// Load keys from the storage file.
@@ -434,15 +428,7 @@ impl KeyProvider for EnvKeyProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Once;
     use tempfile::TempDir;
-
-    fn allow_plaintext_storage() {
-        static INIT: Once = Once::new();
-        INIT.call_once(|| {
-            std::env::set_var(PLAINTEXT_STORAGE_ENV, "1");
-        });
-    }
 
     #[test]
     fn test_secret_key_generate() {
@@ -463,11 +449,11 @@ mod tests {
 
     #[test]
     fn test_local_key_provider_create_and_get() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
 
-        let provider = LocalKeyProvider::new(&key_path).unwrap();
+        let provider =
+            LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
 
         // Create a key via rotation
         let key = provider.rotate_key("test-key").unwrap();
@@ -480,7 +466,6 @@ mod tests {
 
     #[test]
     fn test_local_key_provider_persistence() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
 
@@ -488,14 +473,16 @@ mod tests {
 
         // Create provider and key
         {
-            let provider = LocalKeyProvider::new(&key_path).unwrap();
+            let provider =
+                LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             let key = provider.rotate_key("persist-key").unwrap();
             original_bytes = *key.as_bytes();
         }
 
         // Reopen and verify
         {
-            let provider = LocalKeyProvider::new(&key_path).unwrap();
+            let provider =
+                LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             let key = provider.get_key("persist-key").unwrap();
             assert_eq!(key.as_bytes(), &original_bytes);
         }
@@ -503,11 +490,11 @@ mod tests {
 
     #[test]
     fn test_local_key_provider_rotation() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
 
-        let provider = LocalKeyProvider::new(&key_path).unwrap();
+        let provider =
+            LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
 
         let key1 = provider.rotate_key("rotate-key").unwrap();
         let key2 = provider.rotate_key("rotate-key").unwrap();
@@ -522,11 +509,11 @@ mod tests {
 
     #[test]
     fn test_local_key_provider_list_keys() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
 
-        let provider = LocalKeyProvider::new(&key_path).unwrap();
+        let provider =
+            LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
 
         provider.rotate_key("key-a").unwrap();
         provider.rotate_key("key-b").unwrap();
@@ -540,11 +527,11 @@ mod tests {
 
     #[test]
     fn test_local_key_provider_key_not_found() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let key_path = temp_dir.path().join("keys.jsonl");
 
-        let provider = LocalKeyProvider::new(&key_path).unwrap();
+        let provider =
+            LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
 
         let result = provider.get_key("nonexistent");
 

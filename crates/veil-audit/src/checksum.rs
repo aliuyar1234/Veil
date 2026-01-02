@@ -107,8 +107,14 @@ fn hmac_key_from_env() -> Result<Vec<u8>, AuditError> {
 
 /// Verify the hash chain of a sequence of entries.
 ///
-/// If any entry uses HMAC (`hmac-sha256:` prefix), the key is read from `VEIL_AUDIT_HMAC_KEY_HEX`.
+/// If any entry uses HMAC (`hmac-sha256:` prefix), provide the key via
+/// [`verify_chain_with_key`].
 pub fn verify_chain(entries: &[AuditEntry]) -> Result<(), AuditError> {
+    verify_chain_with_key(entries, None)
+}
+
+/// Verify the hash chain of a sequence of entries, reading the HMAC key from `VEIL_AUDIT_HMAC_KEY_HEX` when needed.
+pub fn verify_chain_from_env(entries: &[AuditEntry]) -> Result<(), AuditError> {
     let key = hmac_key_from_env().ok().map(Zeroizing::new);
     verify_chain_with_key(entries, key.as_ref().map(|k| k.as_slice()))
 }

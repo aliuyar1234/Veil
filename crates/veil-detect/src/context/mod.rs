@@ -40,7 +40,9 @@ pub mod marker;
 pub mod rule;
 pub mod table;
 
-pub use address::{AddressBlock, AddressComponent, AddressComponentType, AddressDetector};
+pub use address::{
+    AddressBlock, AddressComponent, AddressComponentType, AddressDetector, AddressFormat,
+};
 pub use analyzer::{ContextAnalysis, ContextAnalyzer};
 pub use error::ContextError;
 pub use loader::{ConfigLoader, ContextConfig, RuleConfig};

@@ -1,7 +1,5 @@
 //! Dictionary file loading.
 
-#![allow(dead_code)]
-
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -144,8 +142,9 @@ pub fn load_dictionary_from_reader<R: BufRead>(
     Ok(dict)
 }
 
-/// Load a dictionary from a string (for embedded dictionaries).
-pub fn load_dictionary_from_str(
+/// Load a dictionary from a string (used by tests).
+#[cfg(test)]
+pub(super) fn load_dictionary_from_str(
     content: &str,
     id: impl Into<String>,
     name: impl Into<String>,

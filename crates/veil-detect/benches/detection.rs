@@ -4,7 +4,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use veil_detect::DetectorRegistry;
-use veil_parsers::{Position, TextSegment};
+use veil_types::{Position, TextSegment};
 
 fn make_segment(content: &str) -> TextSegment {
     TextSegment {

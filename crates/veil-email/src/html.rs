@@ -6,8 +6,8 @@ use html2text::from_read;
 ///
 /// This function:
 /// - Removes all HTML tags
-/// - Preserves links as [text](url) format
-/// - Converts images to [image: alt] format
+/// - Preserves links as `[text](url)` format
+/// - Converts images to `[image: alt]` format
 /// - Preserves line breaks and paragraph structure
 pub fn convert_html_to_text(html: &str) -> String {
     // Use html2text with a reasonable width

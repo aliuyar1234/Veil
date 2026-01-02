@@ -1,5 +1,7 @@
 //! Error types for cryptographic operations.
 
+use std::path::PathBuf;
+
 use thiserror::Error;
 
 /// Errors that can occur during cryptographic operations.
@@ -56,7 +58,7 @@ pub enum CryptoError {
     InvalidConfig(String),
 
     /// Plaintext key storage is disabled.
-    #[error("Plaintext key storage is disabled; set VEIL_ALLOW_PLAINTEXT_STORAGE=1 to enable")]
+    #[error("Plaintext key storage is disabled")]
     PlaintextStorageDisabled,
 
     /// Key not found in provider.
@@ -71,6 +73,27 @@ pub enum CryptoError {
 /// Errors that can occur during vault operations.
 #[derive(Debug, Error)]
 pub enum VaultError {
+    /// I/O error while interacting with storage.
+    #[error("I/O error during {action} for {path}: {source}")]
+    Io {
+        action: &'static str,
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// Serialization/deserialization error while interacting with storage.
+    #[error("Serialization error during {action}: {source}")]
+    Json {
+        action: &'static str,
+        #[source]
+        source: serde_json::Error,
+    },
+
+    /// Lock poisoning or synchronization error.
+    #[error("Lock poisoned during {action}")]
+    LockPoisoned { action: &'static str },
+
     /// Storage operation failed.
     #[error("Storage error: {0}")]
     Storage(String),
@@ -84,6 +107,28 @@ pub enum VaultError {
     Duplicate(String),
 
     /// Plaintext vault storage is disabled.
-    #[error("Plaintext vault storage is disabled; set VEIL_ALLOW_PLAINTEXT_STORAGE=1 to enable")]
+    #[error("Plaintext vault storage is disabled")]
     PlaintextStorageDisabled,
+}
+
+impl VaultError {
+    pub(crate) fn io(
+        action: &'static str,
+        path: impl Into<PathBuf>,
+        source: std::io::Error,
+    ) -> Self {
+        Self::Io {
+            action,
+            path: path.into(),
+            source,
+        }
+    }
+
+    pub(crate) fn json(action: &'static str, source: serde_json::Error) -> Self {
+        Self::Json { action, source }
+    }
+
+    pub(crate) fn lock_poisoned(action: &'static str) -> Self {
+        Self::LockPoisoned { action }
+    }
 }

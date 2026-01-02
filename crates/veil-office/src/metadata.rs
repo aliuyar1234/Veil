@@ -5,7 +5,7 @@ use quick_xml::Reader;
 use serde::{Deserialize, Serialize};
 use std::io::BufRead;
 
-use veil_parsers::{Position, TextSegment};
+use veil_types::{ParseWarning, Position, TextSegment};
 
 /// Dublin Core and extended metadata fields from Office documents.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -101,9 +101,13 @@ impl OfficeMetadata {
 }
 
 /// Parse Dublin Core metadata from docProps/core.xml.
-pub fn parse_core_xml<R: BufRead>(reader: R) -> OfficeMetadata {
+pub fn parse_core_xml<R: BufRead>(
+    source_name: &str,
+    reader: R,
+) -> (OfficeMetadata, Vec<ParseWarning>) {
     let mut metadata = OfficeMetadata::new();
     let mut xml_reader = Reader::from_reader(reader);
+    let mut warnings = Vec::new();
 
     let mut buf = Vec::new();
     let mut current_element: Option<String> = None;
@@ -136,18 +140,26 @@ pub fn parse_core_xml<R: BufRead>(reader: R) -> OfficeMetadata {
                 current_element = None;
             }
             Ok(Event::Eof) => break,
-            Err(_) => break,
+            Err(_) => {
+                warnings.push(crate::warnings::xml_parse_warning(source_name));
+                break;
+            }
             _ => {}
         }
         buf.clear();
     }
 
-    metadata
+    (metadata, warnings)
 }
 
 /// Parse extended properties from docProps/app.xml.
-pub fn parse_app_xml<R: BufRead>(reader: R, metadata: &mut OfficeMetadata) {
+pub fn parse_app_xml<R: BufRead>(
+    source_name: &str,
+    reader: R,
+    metadata: &mut OfficeMetadata,
+) -> Vec<ParseWarning> {
     let mut xml_reader = Reader::from_reader(reader);
+    let mut warnings = Vec::new();
 
     let mut buf = Vec::new();
     let mut current_element: Option<String> = None;
@@ -175,11 +187,16 @@ pub fn parse_app_xml<R: BufRead>(reader: R, metadata: &mut OfficeMetadata) {
                 current_element = None;
             }
             Ok(Event::Eof) => break,
-            Err(_) => break,
+            Err(_) => {
+                warnings.push(crate::warnings::xml_parse_warning(source_name));
+                break;
+            }
             _ => {}
         }
         buf.clear();
     }
+
+    warnings
 }
 
 #[cfg(test)]
@@ -199,7 +216,8 @@ mod tests {
     <dcterms:created>2024-01-15T10:30:00Z</dcterms:created>
 </cp:coreProperties>"#;
 
-        let metadata = parse_core_xml(Cursor::new(xml));
+        let (metadata, warnings) = parse_core_xml("docProps/core.xml", Cursor::new(xml));
+        assert!(warnings.is_empty());
 
         assert_eq!(metadata.title, Some("Test Document".to_string()));
         assert_eq!(metadata.creator, Some("John Doe".to_string()));
@@ -217,7 +235,8 @@ mod tests {
 </Properties>"#;
 
         let mut metadata = OfficeMetadata::new();
-        parse_app_xml(Cursor::new(xml), &mut metadata);
+        let warnings = parse_app_xml("docProps/app.xml", Cursor::new(xml), &mut metadata);
+        assert!(warnings.is_empty());
 
         assert_eq!(metadata.company, Some("Acme Corp".to_string()));
         assert_eq!(metadata.manager, Some("Bob Manager".to_string()));

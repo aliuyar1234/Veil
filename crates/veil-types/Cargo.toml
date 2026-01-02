@@ -1,0 +1,15 @@
+[package]
+name = "veil-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+description = "Shared core types used across Veil crates"
+keywords = ["types", "pii", "privacy"]
+categories = ["data-structures"]
+
+[dependencies]
+veil-core = { path = "../veil-core", version = "0.1.0" }
+serde.workspace = true

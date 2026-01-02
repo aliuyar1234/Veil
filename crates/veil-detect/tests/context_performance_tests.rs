@@ -5,7 +5,7 @@
 
 use std::time::Instant;
 
-use veil_detect::context::{AddressDetector, ContextAnalyzer, TableDetector};
+use veil_detect::context::{AddressDetector, AddressFormat, ContextAnalyzer, TableDetector};
 use veil_detect::{Finding, PiiCategory, ValidationStatus};
 
 /// Create a test finding.
@@ -159,7 +159,7 @@ Los Angeles, CA 90001
 Chicago, IL 60601
 "#;
 
-    let detector = AddressDetector::new("en");
+    let detector = AddressDetector::new(AddressFormat::En);
 
     let start = Instant::now();
     for _ in 0..100 {

@@ -1,7 +1,5 @@
 //! Text normalization for dictionary matching.
 
-#![allow(dead_code)]
-
 use unicode_normalization::UnicodeNormalization;
 
 /// Normalize text for dictionary matching.
@@ -20,11 +18,6 @@ use unicode_normalization::UnicodeNormalization;
 pub fn normalize_for_matching(s: &str) -> String {
     // NFD decomposition followed by lowercase
     s.nfd().collect::<String>().to_lowercase()
-}
-
-/// Check if two strings match after normalization.
-pub fn normalized_eq(a: &str, b: &str) -> bool {
-    normalize_for_matching(a) == normalize_for_matching(b)
 }
 
 /// Normalize for storage in FST (must be ASCII-safe for FST).
@@ -71,9 +64,18 @@ mod tests {
 
     #[test]
     fn test_normalized_eq() {
-        assert!(normalized_eq("Müller", "MÜLLER"));
-        assert!(normalized_eq("Maria", "maria"));
-        assert!(!normalized_eq("Max", "Moritz"));
+        assert_eq!(
+            normalize_for_matching("Müller"),
+            normalize_for_matching("MÜLLER")
+        );
+        assert_eq!(
+            normalize_for_matching("Maria"),
+            normalize_for_matching("maria")
+        );
+        assert_ne!(
+            normalize_for_matching("Max"),
+            normalize_for_matching("Moritz")
+        );
     }
 
     #[test]

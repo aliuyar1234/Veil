@@ -3,7 +3,7 @@
 //! Run with: cargo run --example context_detection -p veil-detect
 
 use veil_detect::DetectorRegistry;
-use veil_parsers::{Position, TextSegment};
+use veil_types::{Position, TextSegment};
 
 fn main() {
     println!("=== Context-Aware PII Detection Example ===\n");

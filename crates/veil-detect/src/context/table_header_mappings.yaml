@@ -1,0 +1,213 @@
+mappings:
+  # Email headers
+  - header: email
+    category: email
+    boost: 0.4
+  - header: e-mail
+    category: email
+    boost: 0.4
+  - header: email_address
+    category: email
+    boost: 0.4
+  - header: emailaddress
+    category: email
+    boost: 0.4
+  - header: mail
+    category: email
+    boost: 0.4
+  - header: correo
+    category: email
+    boost: 0.4
+
+  # Phone headers
+  - header: phone
+    category: phone
+    boost: 0.4
+  - header: telephone
+    category: phone
+    boost: 0.4
+  - header: tel
+    category: phone
+    boost: 0.4
+  - header: mobile
+    category: phone
+    boost: 0.4
+  - header: cell
+    category: phone
+    boost: 0.4
+  - header: phone_number
+    category: phone
+    boost: 0.4
+  - header: phonenumber
+    category: phone
+    boost: 0.4
+  - header: telefon
+    category: phone
+    boost: 0.4
+  - header: téléphone
+    category: phone
+    boost: 0.4
+
+  # Name headers (custom PersonName)
+  - header: name
+    category: "custom:PersonName"
+    boost: 0.35
+  - header: full_name
+    category: "custom:PersonName"
+    boost: 0.35
+  - header: fullname
+    category: "custom:PersonName"
+    boost: 0.35
+  - header: customer_name
+    category: "custom:PersonName"
+    boost: 0.35
+  - header: customername
+    category: "custom:PersonName"
+    boost: 0.35
+  - header: first_name
+    category: "custom:PersonName"
+    boost: 0.35
+  - header: firstname
+    category: "custom:PersonName"
+    boost: 0.35
+  - header: last_name
+    category: "custom:PersonName"
+    boost: 0.35
+  - header: lastname
+    category: "custom:PersonName"
+    boost: 0.35
+  - header: nom
+    category: "custom:PersonName"
+    boost: 0.35
+  - header: prénom
+    category: "custom:PersonName"
+    boost: 0.35
+  - header: vorname
+    category: "custom:PersonName"
+    boost: 0.35
+  - header: nachname
+    category: "custom:PersonName"
+    boost: 0.35
+
+  # SSN headers
+  - header: ssn
+    category: "custom:SSN"
+    boost: 0.5
+  - header: social_security
+    category: "custom:SSN"
+    boost: 0.5
+  - header: socialsecurity
+    category: "custom:SSN"
+    boost: 0.5
+  - header: ss_number
+    category: "custom:SSN"
+    boost: 0.5
+  - header: ssnumber
+    category: "custom:SSN"
+    boost: 0.5
+
+  # Credit card headers
+  - header: credit_card
+    category: credit_card
+    boost: 0.55
+  - header: creditcard
+    category: credit_card
+    boost: 0.55
+  - header: card_number
+    category: credit_card
+    boost: 0.55
+  - header: cardnumber
+    category: credit_card
+    boost: 0.55
+  - header: cc_number
+    category: credit_card
+    boost: 0.55
+  - header: ccnumber
+    category: credit_card
+    boost: 0.55
+  - header: payment_card
+    category: credit_card
+    boost: 0.55
+
+  # Address headers
+  - header: address
+    category: "custom:Address"
+    boost: 0.35
+  - header: street
+    category: "custom:Address"
+    boost: 0.35
+  - header: street_address
+    category: "custom:Address"
+    boost: 0.35
+  - header: streetaddress
+    category: "custom:Address"
+    boost: 0.35
+  - header: addr
+    category: "custom:Address"
+    boost: 0.35
+  - header: adresse
+    category: "custom:Address"
+    boost: 0.35
+  - header: anschrift
+    category: "custom:Address"
+    boost: 0.35
+
+  # IP address headers
+  - header: ip
+    category: ipv4
+    boost: 0.4
+  - header: ip_address
+    category: ipv4
+    boost: 0.4
+  - header: ipaddress
+    category: ipv4
+    boost: 0.4
+  - header: client_ip
+    category: ipv4
+    boost: 0.4
+  - header: clientip
+    category: ipv4
+    boost: 0.4
+  - header: source_ip
+    category: ipv4
+    boost: 0.4
+  - header: sourceip
+    category: ipv4
+    boost: 0.4
+
+  # ID headers (generic, lower boost since "ID" is ambiguous)
+  - header: id
+    category: "custom:ID"
+    boost: 0.15
+  - header: user_id
+    category: "custom:ID"
+    boost: 0.15
+  - header: userid
+    category: "custom:ID"
+    boost: 0.15
+  - header: customer_id
+    category: "custom:ID"
+    boost: 0.15
+  - header: customerid
+    category: "custom:ID"
+    boost: 0.15
+
+  # Date of birth headers
+  - header: dob
+    category: "custom:DateOfBirth"
+    boost: 0.35
+  - header: date_of_birth
+    category: "custom:DateOfBirth"
+    boost: 0.35
+  - header: dateofbirth
+    category: "custom:DateOfBirth"
+    boost: 0.35
+  - header: birthdate
+    category: "custom:DateOfBirth"
+    boost: 0.35
+  - header: birth_date
+    category: "custom:DateOfBirth"
+    boost: 0.35
+  - header: geburtsdatum
+    category: "custom:DateOfBirth"
+    boost: 0.35

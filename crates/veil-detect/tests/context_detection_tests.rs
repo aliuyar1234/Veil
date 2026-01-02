@@ -2,7 +2,7 @@
 
 use veil_detect::context::{ContextAction, ContextAnalyzer, ContextRule};
 use veil_detect::{DetectorRegistry, Finding, PiiCategory, ValidationStatus};
-use veil_parsers::{Position, TextSegment};
+use veil_types::{Position, TextSegment};
 
 fn make_segment(content: &str) -> TextSegment {
     TextSegment {

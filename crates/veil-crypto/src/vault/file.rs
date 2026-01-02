@@ -4,27 +4,13 @@ use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{OnceLock, RwLock};
+use std::sync::RwLock;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::VaultError;
 use crate::vault::TokenVault;
-
-const PLAINTEXT_STORAGE_ENV: &str = "VEIL_ALLOW_PLAINTEXT_STORAGE";
-
-fn plaintext_storage_allowed() -> bool {
-    static ALLOW: OnceLock<bool> = OnceLock::new();
-    *ALLOW.get_or_init(|| {
-        std::env::var(PLAINTEXT_STORAGE_ENV)
-            .ok()
-            .map(|value| {
-                let normalized = value.trim().to_ascii_lowercase();
-                normalized == "1" || normalized == "true" || normalized == "yes"
-            })
-            .unwrap_or(false)
-    })
-}
+use crate::PlaintextStoragePolicy;
 
 fn open_secure_append(path: &Path) -> Result<File, VaultError> {
     let mut options = OpenOptions::new();
@@ -36,7 +22,7 @@ fn open_secure_append(path: &Path) -> Result<File, VaultError> {
     }
     options
         .open(path)
-        .map_err(|e| VaultError::Storage(format!("Failed to open vault file: {}", e)))
+        .map_err(|e| VaultError::io("open vault file", path, e))
 }
 
 fn create_secure_file(path: &Path) -> Result<File, VaultError> {
@@ -49,7 +35,7 @@ fn create_secure_file(path: &Path) -> Result<File, VaultError> {
     }
     options
         .open(path)
-        .map_err(|e| VaultError::Storage(format!("Failed to create vault file: {}", e)))
+        .map_err(|e| VaultError::io("create vault file", path, e))
 }
 
 /// A token entry stored in the vault file.
@@ -65,8 +51,8 @@ struct TokenEntry {
 /// Thread-safe with in-memory caching for performance.
 ///
 /// # Security
-/// Plaintext storage is disabled by default. Set
-/// `VEIL_ALLOW_PLAINTEXT_STORAGE=1` to enable.
+/// Plaintext storage is disabled by default. Pass
+/// `PlaintextStoragePolicy::allow_insecure()` (or use `new_from_env`).
 pub struct FileVault {
     /// Path to the vault file.
     path: PathBuf,
@@ -93,19 +79,21 @@ impl FileVault {
     /// Create a new file vault at the given path.
     ///
     /// If the file exists, loads existing tokens. Otherwise creates a new file.
-    pub fn new(path: impl Into<PathBuf>) -> Result<Self, VaultError> {
+    pub fn new(
+        path: impl Into<PathBuf>,
+        storage_policy: PlaintextStoragePolicy,
+    ) -> Result<Self, VaultError> {
         let path = path.into();
 
-        if !plaintext_storage_allowed() {
+        if !storage_policy.is_allowed() {
             return Err(VaultError::PlaintextStorageDisabled);
         }
 
         // Create parent directory if needed
         if let Some(parent) = path.parent() {
             if !parent.exists() {
-                fs::create_dir_all(parent).map_err(|e| {
-                    VaultError::Storage(format!("Failed to create directory: {}", e))
-                })?;
+                fs::create_dir_all(parent)
+                    .map_err(|e| VaultError::io("create vault directory", parent, e))?;
             }
         }
 
@@ -121,35 +109,39 @@ impl FileVault {
         Ok(vault)
     }
 
+    /// Create a new file vault using `VEIL_ALLOW_PLAINTEXT_STORAGE`.
+    pub fn new_from_env(path: impl Into<PathBuf>) -> Result<Self, VaultError> {
+        Self::new(path, PlaintextStoragePolicy::from_env())
+    }
+
     /// Load tokens from the vault file.
     fn load(&mut self) -> Result<(), VaultError> {
         if !self.path.exists() {
             return Ok(());
         }
 
-        let file = File::open(&self.path)
-            .map_err(|e| VaultError::Storage(format!("Failed to open vault file: {}", e)))?;
+        let file =
+            File::open(&self.path).map_err(|e| VaultError::io("open vault file", &self.path, e))?;
 
         let reader = BufReader::new(file);
 
         let mut tokens = self
             .tokens
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire tokens write lock"))?;
         let mut reverse = self
             .reverse
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire reverse write lock"))?;
 
         for line in reader.lines() {
-            let line =
-                line.map_err(|e| VaultError::Storage(format!("Failed to read line: {}", e)))?;
+            let line = line.map_err(|e| VaultError::io("read vault line", &self.path, e))?;
             if line.trim().is_empty() {
                 continue;
             }
 
             let entry: TokenEntry = serde_json::from_str(&line)
-                .map_err(|e| VaultError::Storage(format!("Invalid entry format: {}", e)))?;
+                .map_err(|e| VaultError::json("parse vault entry", e))?;
 
             tokens.insert(entry.token.clone(), entry.original.clone());
             reverse.insert(entry.original, entry.token);
@@ -166,12 +158,12 @@ impl FileVault {
         };
 
         let json = serde_json::to_string(&entry)
-            .map_err(|e| VaultError::Storage(format!("Failed to serialize entry: {}", e)))?;
+            .map_err(|e| VaultError::json("serialize vault entry", e))?;
 
         let mut file = open_secure_append(&self.path)?;
 
         writeln!(file, "{}", json)
-            .map_err(|e| VaultError::Storage(format!("Failed to write entry: {}", e)))?;
+            .map_err(|e| VaultError::io("append vault entry", &self.path, e))?;
 
         Ok(())
     }
@@ -181,7 +173,7 @@ impl FileVault {
         let tokens = self
             .tokens
             .read()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire tokens read lock"))?;
 
         // Write to a temporary file first for atomicity
         let temp_path = self.path.with_extension("tmp");
@@ -193,14 +185,14 @@ impl FileVault {
                 original: original.clone(),
             };
             let json = serde_json::to_string(&entry)
-                .map_err(|e| VaultError::Storage(format!("Failed to serialize: {}", e)))?;
+                .map_err(|e| VaultError::json("serialize vault entry", e))?;
             writeln!(file, "{}", json)
-                .map_err(|e| VaultError::Storage(format!("Failed to write: {}", e)))?;
+                .map_err(|e| VaultError::io("write vault file", &temp_path, e))?;
         }
 
         // Atomically replace the original file
         fs::rename(&temp_path, &self.path)
-            .map_err(|e| VaultError::Storage(format!("Failed to replace vault file: {}", e)))?;
+            .map_err(|e| VaultError::io("replace vault file", &self.path, e))?;
 
         Ok(())
     }
@@ -227,12 +219,12 @@ impl TokenVault for FileVault {
         let mut tokens = self
             .tokens
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire tokens write lock"))?;
 
         let mut reverse = self
             .reverse
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire reverse write lock"))?;
 
         // Check for duplicate token
         if tokens.contains_key(token) {
@@ -253,7 +245,7 @@ impl TokenVault for FileVault {
         let tokens = self
             .tokens
             .read()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire tokens read lock"))?;
 
         Ok(tokens.get(token).cloned())
     }
@@ -262,12 +254,12 @@ impl TokenVault for FileVault {
         let mut tokens = self
             .tokens
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire tokens write lock"))?;
 
         let mut reverse = self
             .reverse
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire reverse write lock"))?;
 
         // Remove from in-memory maps
         if let Some(original) = tokens.remove(token) {
@@ -286,7 +278,7 @@ impl TokenVault for FileVault {
         let reverse = self
             .reverse
             .read()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire reverse read lock"))?;
 
         Ok(reverse.get(original).cloned())
     }
@@ -295,21 +287,12 @@ impl TokenVault for FileVault {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Once;
     use tempfile::TempDir;
 
-    fn allow_plaintext_storage() {
-        static INIT: Once = Once::new();
-        INIT.call_once(|| {
-            std::env::set_var(PLAINTEXT_STORAGE_ENV, "1");
-        });
-    }
-
     fn temp_vault() -> (TempDir, FileVault) {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let vault_path = temp_dir.path().join("tokens.jsonl");
-        let vault = FileVault::new(&vault_path).unwrap();
+        let vault = FileVault::new(&vault_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
         (temp_dir, vault)
     }
 
@@ -325,19 +308,20 @@ mod tests {
 
     #[test]
     fn test_persistence() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let vault_path = temp_dir.path().join("tokens.jsonl");
 
         // Create vault and store tokens
         {
-            let vault = FileVault::new(&vault_path).unwrap();
+            let vault =
+                FileVault::new(&vault_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             vault.store("tok_persist", "persisted_value").unwrap();
         }
 
         // Reopen vault and verify
         {
-            let vault = FileVault::new(&vault_path).unwrap();
+            let vault =
+                FileVault::new(&vault_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             let result = vault.lookup("tok_persist").unwrap();
             assert_eq!(result, Some("persisted_value".to_string()));
         }
@@ -376,13 +360,13 @@ mod tests {
 
     #[test]
     fn test_delete_persists() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let vault_path = temp_dir.path().join("tokens.jsonl");
 
         // Store and delete
         {
-            let vault = FileVault::new(&vault_path).unwrap();
+            let vault =
+                FileVault::new(&vault_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             vault.store("tok_a", "value_a").unwrap();
             vault.store("tok_b", "value_b").unwrap();
             vault.delete("tok_a").unwrap();
@@ -390,7 +374,8 @@ mod tests {
 
         // Reopen and verify deletion persisted
         {
-            let vault = FileVault::new(&vault_path).unwrap();
+            let vault =
+                FileVault::new(&vault_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             assert_eq!(vault.lookup("tok_a").unwrap(), None);
             assert_eq!(vault.lookup("tok_b").unwrap(), Some("value_b".to_string()));
         }
@@ -440,7 +425,6 @@ mod tests {
 
     #[test]
     fn test_creates_parent_directory() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let nested_path = temp_dir
             .path()
@@ -448,7 +432,7 @@ mod tests {
             .join("dir")
             .join("tokens.jsonl");
 
-        let vault = FileVault::new(&nested_path).unwrap();
+        let vault = FileVault::new(&nested_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
         vault.store("tok", "val").unwrap();
 
         assert!(nested_path.parent().unwrap().exists());
@@ -456,13 +440,13 @@ mod tests {
 
     #[test]
     fn test_multiple_tokens_persist() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let vault_path = temp_dir.path().join("tokens.jsonl");
 
         // Store multiple tokens
         {
-            let vault = FileVault::new(&vault_path).unwrap();
+            let vault =
+                FileVault::new(&vault_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             for i in 0..10 {
                 vault
                     .store(&format!("tok_{}", i), &format!("val_{}", i))
@@ -472,7 +456,8 @@ mod tests {
 
         // Verify all persist
         {
-            let vault = FileVault::new(&vault_path).unwrap();
+            let vault =
+                FileVault::new(&vault_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             assert_eq!(vault.len(), 10);
             for i in 0..10 {
                 let result = vault.lookup(&format!("tok_{}", i)).unwrap();
@@ -483,19 +468,20 @@ mod tests {
 
     #[test]
     fn test_find_by_original_after_reload() {
-        allow_plaintext_storage();
         let temp_dir = TempDir::new().unwrap();
         let vault_path = temp_dir.path().join("tokens.jsonl");
 
         // Store
         {
-            let vault = FileVault::new(&vault_path).unwrap();
+            let vault =
+                FileVault::new(&vault_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             vault.store("tok_find", "original_find").unwrap();
         }
 
         // Reload and find
         {
-            let vault = FileVault::new(&vault_path).unwrap();
+            let vault =
+                FileVault::new(&vault_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
             let result = vault.find_by_original("original_find").unwrap();
             assert_eq!(result, Some("tok_find".to_string()));
         }

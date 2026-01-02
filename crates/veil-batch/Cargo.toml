@@ -27,6 +27,7 @@ tracing = { workspace = true }
 # Veil crates
 veil-core = { path = "../veil-core", version = "0.1.0" }
 veil-parsers = { path = "../veil-parsers", version = "0.1.0" }
+veil-fs = { path = "../veil-fs", version = "0.1.0" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

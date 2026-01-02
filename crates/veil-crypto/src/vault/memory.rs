@@ -54,12 +54,12 @@ impl TokenVault for InMemoryVault {
         let mut tokens = self
             .tokens
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire tokens write lock"))?;
 
         let mut reverse = self
             .reverse
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire reverse write lock"))?;
 
         // Check for duplicate token
         if tokens.contains_key(token) {
@@ -78,7 +78,7 @@ impl TokenVault for InMemoryVault {
         let tokens = self
             .tokens
             .read()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire tokens read lock"))?;
 
         // Convert SensitiveString back to String for return
         Ok(tokens.get(token).map(|s| s.as_str().to_string()))
@@ -88,12 +88,12 @@ impl TokenVault for InMemoryVault {
         let mut tokens = self
             .tokens
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire tokens write lock"))?;
 
         let mut reverse = self
             .reverse
             .write()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire reverse write lock"))?;
 
         // Find original value to remove from reverse map
         if let Some(original) = tokens.remove(token) {
@@ -108,7 +108,7 @@ impl TokenVault for InMemoryVault {
         let reverse = self
             .reverse
             .read()
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+            .map_err(|_| VaultError::lock_poisoned("acquire reverse read lock"))?;
 
         // Create a SensitiveString key for lookup
         let key = SensitiveString::new(original);

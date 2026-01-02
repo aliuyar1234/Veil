@@ -1,17 +1,12 @@
 //! Confidence scoring for dictionary matches.
 
-#![allow(dead_code)]
-
 use super::entry::DictionaryEntry;
-use super::fuzzy::FuzzyMatch;
 
 /// Context signals that can boost confidence.
 #[derive(Debug, Clone, Default)]
 pub struct ContextSignals {
     /// Text before the match.
     pub prefix: Option<String>,
-    /// Text after the match.
-    pub suffix: Option<String>,
     /// Whether the match starts with a capital letter.
     pub is_capitalized: bool,
 }
@@ -27,14 +22,6 @@ impl ContextSignals {
             None
         };
 
-        // Get suffix (up to 20 chars after)
-        let suffix_end = (end + 20).min(text.len());
-        let suffix = if suffix_end > end {
-            Some(text[end..suffix_end].to_string())
-        } else {
-            None
-        };
-
         // Check capitalization
         let matched = &text[start..end];
         let is_capitalized = matched
@@ -45,7 +32,6 @@ impl ContextSignals {
 
         Self {
             prefix,
-            suffix,
             is_capitalized,
         }
     }
@@ -83,27 +69,6 @@ impl ContextSignals {
     }
 }
 
-/// Calculate confidence score for an exact match.
-///
-/// Formula: base_frequency × context_bonus
-pub fn calculate_exact_confidence(entry: &DictionaryEntry, context: &ContextSignals) -> f32 {
-    let base = entry.frequency;
-    let bonus = context.context_bonus();
-
-    (base * bonus).min(1.0)
-}
-
-/// Calculate confidence score for a fuzzy match.
-///
-/// Formula: base_frequency × similarity × context_bonus
-pub fn calculate_fuzzy_confidence(fuzzy_match: &FuzzyMatch, context: &ContextSignals) -> f32 {
-    let base = fuzzy_match.entry.frequency;
-    let similarity = fuzzy_match.similarity as f32;
-    let bonus = context.context_bonus();
-
-    (base * similarity * bonus).min(1.0)
-}
-
 /// Calculate confidence from match type.
 pub fn calculate_confidence(
     entry: &DictionaryEntry,
@@ -120,6 +85,7 @@ pub fn calculate_confidence(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dictionary::FuzzyMatch;
 
     #[test]
     fn test_context_signals_from_context() {
@@ -135,7 +101,6 @@ mod tests {
     fn test_honorific_prefix() {
         let signals = ContextSignals {
             prefix: Some("Sehr geehrter Herr ".to_string()),
-            suffix: None,
             is_capitalized: true,
         };
 
@@ -147,7 +112,6 @@ mod tests {
     fn test_no_honorific() {
         let signals = ContextSignals {
             prefix: Some("Der Name ist ".to_string()),
-            suffix: None,
             is_capitalized: true,
         };
 
@@ -159,7 +123,7 @@ mod tests {
         let entry = DictionaryEntry::with_frequency("Maria", 0.92);
         let context = ContextSignals::default();
 
-        let confidence = calculate_exact_confidence(&entry, &context);
+        let confidence = calculate_confidence(&entry, None, &context);
         assert!((confidence - 0.92).abs() < 0.01);
     }
 
@@ -168,11 +132,10 @@ mod tests {
         let entry = DictionaryEntry::with_frequency("Maria", 0.92);
         let context = ContextSignals {
             prefix: Some("Frau ".to_string()),
-            suffix: None,
             is_capitalized: true,
         };
 
-        let confidence = calculate_exact_confidence(&entry, &context);
+        let confidence = calculate_confidence(&entry, None, &context);
         // Should be boosted by honorific + capitalization
         assert!(confidence > 0.92);
     }
@@ -187,7 +150,8 @@ mod tests {
         };
         let context = ContextSignals::default();
 
-        let confidence = calculate_fuzzy_confidence(&fuzzy_match, &context);
+        let confidence =
+            calculate_confidence(&fuzzy_match.entry, Some(fuzzy_match.similarity), &context);
         // 0.80 * 0.96 = 0.768
         assert!((confidence - 0.768).abs() < 0.01);
     }
@@ -197,11 +161,10 @@ mod tests {
         let entry = DictionaryEntry::with_frequency("Maria", 0.95);
         let context = ContextSignals {
             prefix: Some("Frau ".to_string()),
-            suffix: None,
             is_capitalized: true,
         };
 
-        let confidence = calculate_exact_confidence(&entry, &context);
+        let confidence = calculate_confidence(&entry, None, &context);
         assert!(confidence <= 1.0);
     }
 }

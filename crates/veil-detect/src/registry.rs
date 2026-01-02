@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use veil_parsers::TextSegment;
+use veil_types::TextSegment;
 
 use crate::context::ContextAnalyzer;
 use crate::detector::Detector;
@@ -249,7 +249,7 @@ impl Default for DetectorRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use veil_parsers::Position;
+    use veil_types::Position;
 
     fn make_segment(content: &str) -> TextSegment {
         TextSegment {

@@ -1,0 +1,17 @@
+[package]
+name = "veil-fs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+description = "Shared filesystem helpers for Veil crates"
+keywords = ["filesystem", "walkdir"]
+categories = ["filesystem"]
+
+[dependencies]
+walkdir.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

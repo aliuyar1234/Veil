@@ -7,8 +7,8 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use veil_core::HEADER_BUFFER_SIZE;
+use veil_fs::{walk_files, WalkFilesOptions};
 use veil_parsers::FileFormat;
-use walkdir::WalkDir;
 
 /// Discover files to process from the given sources.
 ///
@@ -43,14 +43,19 @@ pub fn discover_files(sources: &[PathBuf], options: &BatchOptions) -> BatchResul
 
 /// Walk a directory and collect file entries.
 fn walk_directory(path: &Path, options: &BatchOptions) -> BatchResult<Vec<FileEntry>> {
-    let mut walker = WalkDir::new(path).follow_links(options.follow_symlinks);
+    let max_depth = if !options.recursive {
+        Some(1)
+    } else {
+        options.max_depth
+    };
 
-    // Apply max depth
-    if !options.recursive {
-        walker = walker.max_depth(1);
-    } else if let Some(depth) = options.max_depth {
-        walker = walker.max_depth(depth);
-    }
+    let walker = walk_files(
+        path,
+        WalkFilesOptions {
+            follow_symlinks: options.follow_symlinks,
+            max_depth,
+        },
+    );
 
     let mut entries = Vec::new();
 
@@ -58,25 +63,26 @@ fn walk_directory(path: &Path, options: &BatchOptions) -> BatchResult<Vec<FileEn
         let entry = match entry_result {
             Ok(e) => e,
             Err(e) => {
+                let error_path = e
+                    .path()
+                    .map(redact_path)
+                    .unwrap_or_else(|| "unknown".to_string());
+
                 // Log error but continue processing
-                eprintln!(
-                    "Warning: Failed to access path: {}",
+                tracing::warn!(
+                    "Warning: Failed to access path {}: {}",
+                    error_path,
                     redact_text(&e.to_string())
                 );
                 continue;
             }
         };
 
-        // Skip directories
-        if entry.file_type().is_dir() {
-            continue;
-        }
-
         // Get file metadata
         let metadata = match entry.metadata() {
             Ok(m) => m,
             Err(e) => {
-                eprintln!(
+                tracing::warn!(
                     "Warning: Failed to get metadata for {}: {}",
                     redact_path(entry.path()),
                     redact_text(&e.to_string())

@@ -3,7 +3,7 @@
 //! Tests realistic documents containing German, Austrian, and Swiss PII data.
 
 use veil_detect::{DetectorRegistry, PiiCategory};
-use veil_parsers::{Position, TextSegment};
+use veil_types::{Position, TextSegment};
 
 fn make_segment(content: &str) -> TextSegment {
     TextSegment {

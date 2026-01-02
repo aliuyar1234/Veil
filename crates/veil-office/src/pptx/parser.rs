@@ -10,7 +10,7 @@ use zip::ZipArchive;
 use crate::error::{OfficeError, Result};
 use crate::metadata::{parse_app_xml, parse_core_xml, OfficeMetadata};
 use crate::security::{is_encrypted, validate_archive, SecurityLimits};
-use veil_parsers::{DocumentMetadata, FileFormat, ParseResult, Position, TextSegment};
+use veil_types::{DocumentMetadata, FileFormat, ParseResult, ParseWarning, Position, TextSegment};
 
 /// Element types in PowerPoint presentations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +59,7 @@ pub fn parse_pptx<R: Read + Seek>(reader: R) -> Result<ParseResult> {
 
     let mut segments = Vec::new();
     let mut total_chars = 0;
+    let mut warnings = Vec::new();
 
     // Find all slide files
     let slide_files: Vec<String> = (1..=1000)
@@ -71,15 +72,18 @@ pub fn parse_pptx<R: Read + Seek>(reader: R) -> Result<ParseResult> {
         let slide_num = slide_idx + 1;
 
         // Extract slide content
-        if let Ok((slide_segments, chars)) = extract_slide_xml(&mut archive, slide_path, slide_num)
-        {
-            segments.extend(slide_segments);
-            total_chars += chars;
+        match extract_slide_xml(&mut archive, slide_path, slide_num) {
+            Ok((slide_segments, chars)) => {
+                segments.extend(slide_segments);
+                total_chars += chars;
+            }
+            Err(_) => warnings.push(crate::warnings::xml_parse_warning(slide_path)),
         }
 
         // Extract speaker notes
         let notes_path = format!("ppt/notesSlides/notesSlide{}.xml", slide_num);
-        if let Ok((notes_segments, chars)) = extract_notes_xml(&mut archive, &notes_path, slide_num)
+        if let Ok((notes_segments, chars)) =
+            extract_notes_xml(&mut archive, &notes_path, slide_num, &mut warnings)
         {
             segments.extend(notes_segments);
             total_chars += chars;
@@ -87,7 +91,7 @@ pub fn parse_pptx<R: Read + Seek>(reader: R) -> Result<ParseResult> {
     }
 
     // Extract metadata
-    let metadata = extract_metadata(&mut archive);
+    let metadata = extract_metadata(&mut archive, &mut warnings);
 
     // Add metadata as segments
     if let Some(meta) = metadata {
@@ -109,7 +113,7 @@ pub fn parse_pptx<R: Read + Seek>(reader: R) -> Result<ParseResult> {
             encoding_lossy: false,
         },
         segments,
-        warnings: Vec::new(),
+        warnings,
         total_chars,
         duration_ms,
     })
@@ -218,6 +222,7 @@ fn extract_notes_xml<R: Read + Seek>(
     archive: &mut ZipArchive<R>,
     path: &str,
     slide_num: usize,
+    warnings: &mut Vec<ParseWarning>,
 ) -> Result<(Vec<TextSegment>, usize)> {
     let file = match archive.by_name(path) {
         Ok(f) => f,
@@ -270,7 +275,10 @@ fn extract_notes_xml<R: Read + Seek>(
                 }
             }
             Ok(Event::Eof) => break,
-            Err(_) => break,
+            Err(_) => {
+                warnings.push(crate::warnings::xml_parse_warning(path));
+                break;
+            }
             _ => {}
         }
         buf.clear();
@@ -280,17 +288,27 @@ fn extract_notes_xml<R: Read + Seek>(
 }
 
 /// Extract metadata from docProps files.
-fn extract_metadata<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Option<OfficeMetadata> {
+fn extract_metadata<R: Read + Seek>(
+    archive: &mut ZipArchive<R>,
+    warnings: &mut Vec<ParseWarning>,
+) -> Option<OfficeMetadata> {
     let mut metadata = OfficeMetadata::new();
 
     // Parse core.xml
     if let Ok(file) = archive.by_name("docProps/core.xml") {
-        metadata = parse_core_xml(std::io::BufReader::new(file));
+        let (parsed, mut parsed_warnings) =
+            parse_core_xml("docProps/core.xml", std::io::BufReader::new(file));
+        metadata = parsed;
+        warnings.append(&mut parsed_warnings);
     }
 
     // Parse app.xml
     if let Ok(file) = archive.by_name("docProps/app.xml") {
-        parse_app_xml(std::io::BufReader::new(file), &mut metadata);
+        warnings.extend(parse_app_xml(
+            "docProps/app.xml",
+            std::io::BufReader::new(file),
+            &mut metadata,
+        ));
     }
 
     if metadata.is_empty() {

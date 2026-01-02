@@ -29,7 +29,7 @@ Built-in rules for:
 
 ```rust
 use veil_detect::DetectorRegistry;
-use veil_parsers::{Position, TextSegment};
+use veil_types::{Position, TextSegment};
 
 // Create registry and enable context analysis
 let mut registry = DetectorRegistry::default();
@@ -37,12 +37,12 @@ registry.enable_context_analysis();
 
 // Create text segment
 let segment = TextSegment {
-    content: "Contact: Mr. Smith at smith@example.com".to_string(),
+    content: "Contact: Mr. Smith at smith@example.com".to_string().into(),
     position: Position::Text {
         line: 1,
         column: 1,
         byte_offset: 0,
-        byte_length: 40,
+        byte_length: "Contact: Mr. Smith at smith@example.com".len(),
     },
 };
 

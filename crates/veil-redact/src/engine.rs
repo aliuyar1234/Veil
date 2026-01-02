@@ -11,12 +11,22 @@ use crate::style::RedactionStyle;
 /// Engine for applying redactions to text.
 pub struct RedactionEngine {
     config: RedactionConfig,
+    hmac_key: Option<[u8; 32]>,
 }
 
 impl RedactionEngine {
     /// Create a new redaction engine with the given configuration.
     pub fn new(config: RedactionConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            hmac_key: None,
+        }
+    }
+
+    /// Set an HMAC key used for `AppliedRedaction` hashing.
+    pub fn with_hmac_key(mut self, key: [u8; 32]) -> Self {
+        self.hmac_key = Some(key);
+        self
     }
 
     /// Redact findings in the given text.
@@ -109,13 +119,24 @@ impl RedactionEngine {
             offset += new_len as i64 - original_len as i64;
 
             // Record the redaction
-            redactions.push(AppliedRedaction::new(
-                finding.matched_text.as_str(),
-                &replacement,
-                (original_start, original_end),
-                (adjusted_start, new_end),
-                finding.category.clone(),
-            ));
+            let applied = match &self.hmac_key {
+                Some(key) => AppliedRedaction::new_with_hmac_key(
+                    finding.matched_text.as_str(),
+                    &replacement,
+                    (original_start, original_end),
+                    (adjusted_start, new_end),
+                    finding.category.clone(),
+                    key,
+                ),
+                None => AppliedRedaction::new(
+                    finding.matched_text.as_str(),
+                    &replacement,
+                    (original_start, original_end),
+                    (adjusted_start, new_end),
+                    finding.category.clone(),
+                ),
+            };
+            redactions.push(applied);
 
             position_map.add(PositionMapEntry {
                 original_start,

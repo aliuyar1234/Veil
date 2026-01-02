@@ -13,6 +13,7 @@ pdf = ["dep:pdf-extract"]
 
 [dependencies]
 veil-core = { path = "../veil-core", version = "0.1.0" }
+veil-types = { path = "../veil-types", version = "0.1.0" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

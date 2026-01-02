@@ -137,7 +137,7 @@ pub fn process_archive(
 
         // Check size limit
         if size > options.max_file_size as u64 {
-            eprintln!(
+            tracing::warn!(
                 "Warning: Skipping large file in archive: {} ({} bytes)",
                 redact_text(&file_name),
                 size

@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use veil_email::{parse_email, parse_email_to_result, EmailHeaderValue, EmailParseOptions};
+use veil_types::FileFormat;
 
 fn fixtures_path() -> &'static Path {
     Path::new("tests/fixtures/eml")
@@ -201,7 +202,7 @@ fn test_parse_to_result() {
     let options = EmailParseOptions::default();
     let result = parse_email_to_result(&data, &options).expect("Failed to parse to result");
 
-    assert_eq!(result.metadata.format, veil_parsers::FileFormat::Eml);
+    assert_eq!(result.metadata.format, FileFormat::Eml);
     assert!(!result.segments.is_empty());
     assert!(result.total_chars > 0);
 }

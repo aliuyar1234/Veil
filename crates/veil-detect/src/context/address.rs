@@ -39,6 +39,20 @@ pub enum AddressComponentType {
     FullLine,
 }
 
+/// Supported address formats for detection and metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AddressFormat {
+    /// English/US-style addresses.
+    En,
+    /// German addresses.
+    De,
+    /// French addresses.
+    Fr,
+    /// Auto-detect by running all formats.
+    Auto,
+}
+
 /// A detected postal address block.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddressBlock {
@@ -50,8 +64,8 @@ pub struct AddressBlock {
     pub start: usize,
     /// End position in the original text.
     pub end: usize,
-    /// Language/format detected (en, de, fr).
-    pub format: String,
+    /// Language/format detected.
+    pub format: AddressFormat,
     /// Confidence score (0.0 - 1.0).
     pub confidence: f32,
 }
@@ -62,14 +76,14 @@ impl AddressBlock {
         start: usize,
         end: usize,
         full_text: impl Into<String>,
-        format: impl Into<String>,
+        format: AddressFormat,
     ) -> Self {
         Self {
             components: Vec::new(),
             full_text: full_text.into(),
             start,
             end,
-            format: format.into(),
+            format,
             confidence: 0.0,
         }
     }
@@ -131,8 +145,8 @@ impl AddressBlock {
 
 /// Address detector for multi-line postal addresses.
 pub struct AddressDetector {
-    /// Language to use for detection.
-    language: String,
+    /// Address format to use for detection.
+    format: AddressFormat,
 }
 
 // Lazy-compiled regex patterns for address detection
@@ -177,20 +191,18 @@ static COUNTRY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 impl AddressDetector {
-    /// Create a new address detector for the given language.
-    pub fn new(language: impl Into<String>) -> Self {
-        Self {
-            language: language.into(),
-        }
+    /// Create a new address detector for the given format.
+    pub fn new(format: AddressFormat) -> Self {
+        Self { format }
     }
 
     /// Detect all address blocks in the text.
     pub fn detect(&self, text: &str) -> Vec<AddressBlock> {
-        match self.language.as_str() {
-            "en" => self.detect_english(text),
-            "de" => self.detect_german(text),
-            "fr" => self.detect_french(text),
-            _ => {
+        match self.format {
+            AddressFormat::En => self.detect_english(text),
+            AddressFormat::De => self.detect_german(text),
+            AddressFormat::Fr => self.detect_french(text),
+            AddressFormat::Auto => {
                 // Try all formats and return the best matches
                 let mut results = Vec::new();
                 results.extend(self.detect_english(text));
@@ -214,7 +226,7 @@ impl AddressDetector {
                     self.line_offset(&lines, i) + street_match.start(),
                     0, // Will be updated
                     "",
-                    "en",
+                    AddressFormat::En,
                 );
 
                 block.add_component(AddressComponent {
@@ -306,7 +318,7 @@ impl AddressDetector {
                         full_match.start(),
                         full_match.end(),
                         full_match.as_str(),
-                        "en",
+                        AddressFormat::En,
                     );
 
                     if let (Some(city), Some(state), Some(zip)) =
@@ -352,7 +364,8 @@ impl AddressDetector {
             // German: Street with number (Hauptstraße 42)
             if let Some(street_match) = DE_STREET_REGEX.find(line) {
                 let line_start = self.line_offset(&lines, i);
-                let mut block = AddressBlock::new(line_start + street_match.start(), 0, "", "de");
+                let mut block =
+                    AddressBlock::new(line_start + street_match.start(), 0, "", AddressFormat::De);
 
                 block.add_component(AddressComponent {
                     component_type: AddressComponentType::Street,
@@ -431,7 +444,7 @@ impl AddressDetector {
                         full_match.start(),
                         full_match.end(),
                         full_match.as_str(),
-                        "de",
+                        AddressFormat::De,
                     );
 
                     if let (Some(plz), Some(city)) = (caps.get(1), caps.get(2)) {
@@ -469,7 +482,8 @@ impl AddressDetector {
             // French: Number + street type + name (42 rue de la Paix)
             if let Some(street_match) = FR_STREET_REGEX.find(line) {
                 let line_start = self.line_offset(&lines, i);
-                let mut block = AddressBlock::new(line_start + street_match.start(), 0, "", "fr");
+                let mut block =
+                    AddressBlock::new(line_start + street_match.start(), 0, "", AddressFormat::Fr);
 
                 block.add_component(AddressComponent {
                     component_type: AddressComponentType::Street,
@@ -547,7 +561,7 @@ impl AddressDetector {
                         full_match.start(),
                         full_match.end(),
                         full_match.as_str(),
-                        "fr",
+                        AddressFormat::Fr,
                     );
 
                     if let (Some(cp), Some(city)) = (caps.get(1), caps.get(2)) {
@@ -587,7 +601,7 @@ impl AddressDetector {
 
 impl Default for AddressDetector {
     fn default() -> Self {
-        Self::new("en")
+        Self::new(AddressFormat::En)
     }
 }
 
@@ -597,13 +611,13 @@ mod tests {
 
     #[test]
     fn test_us_address_detection() {
-        let detector = AddressDetector::new("en");
+        let detector = AddressDetector::new(AddressFormat::En);
         let text = "123 Main Street\nNew York, NY 10001";
         let blocks = detector.detect(text);
 
         assert!(!blocks.is_empty());
         let block = &blocks[0];
-        assert_eq!(block.format, "en");
+        assert_eq!(block.format, AddressFormat::En);
         assert!(block
             .components
             .iter()
@@ -612,13 +626,13 @@ mod tests {
 
     #[test]
     fn test_german_address_detection() {
-        let detector = AddressDetector::new("de");
+        let detector = AddressDetector::new(AddressFormat::De);
         let text = "Hauptstraße 42\n80331 München";
         let blocks = detector.detect(text);
 
         assert!(!blocks.is_empty());
         let block = &blocks[0];
-        assert_eq!(block.format, "de");
+        assert_eq!(block.format, AddressFormat::De);
         assert!(block
             .components
             .iter()
@@ -627,18 +641,18 @@ mod tests {
 
     #[test]
     fn test_french_address_detection() {
-        let detector = AddressDetector::new("fr");
+        let detector = AddressDetector::new(AddressFormat::Fr);
         let text = "42 rue de la Paix\n75002 Paris";
         let blocks = detector.detect(text);
 
         assert!(!blocks.is_empty());
         let block = &blocks[0];
-        assert_eq!(block.format, "fr");
+        assert_eq!(block.format, AddressFormat::Fr);
     }
 
     #[test]
     fn test_single_line_city_state_zip() {
-        let detector = AddressDetector::new("en");
+        let detector = AddressDetector::new(AddressFormat::En);
         let text = "Send to: San Francisco, CA 94102";
         let blocks = detector.detect(text);
 
@@ -656,7 +670,7 @@ mod tests {
 
     #[test]
     fn test_address_with_country() {
-        let detector = AddressDetector::new("en");
+        let detector = AddressDetector::new(AddressFormat::En);
         let text = "123 Main Street\nNew York, NY 10001\nUnited States";
         let blocks = detector.detect(text);
 
@@ -666,7 +680,7 @@ mod tests {
 
     #[test]
     fn test_confidence_calculation() {
-        let mut block = AddressBlock::new(0, 50, "test", "en");
+        let mut block = AddressBlock::new(0, 50, "test", AddressFormat::En);
         block.add_component(AddressComponent {
             component_type: AddressComponentType::Street,
             text: "123 Main St".to_string(),
@@ -687,7 +701,7 @@ mod tests {
 
     #[test]
     fn test_invalid_address() {
-        let detector = AddressDetector::new("en");
+        let detector = AddressDetector::new(AddressFormat::En);
         let text = "Hello world, this is not an address";
         let blocks = detector.detect(text);
 
@@ -696,7 +710,7 @@ mod tests {
 
     #[test]
     fn test_german_plz_format() {
-        let detector = AddressDetector::new("de");
+        let detector = AddressDetector::new(AddressFormat::De);
         let text = "PLZ: 10115 Berlin";
         let blocks = detector.detect(text);
 

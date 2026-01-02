@@ -123,7 +123,7 @@ impl ScanResult {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ProtectStyle {
-    /// Replace with [CATEGORY] labels (e.g., [EMAIL])
+    /// Replace with `[CATEGORY]` labels (e.g., `[EMAIL]`)
     #[default]
     Labels,
 

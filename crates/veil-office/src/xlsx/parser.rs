@@ -12,13 +12,14 @@ use zip::ZipArchive;
 use crate::error::{OfficeError, Result};
 use crate::metadata::{parse_app_xml, parse_core_xml, OfficeMetadata};
 use crate::security::{is_encrypted, validate_archive, SecurityLimits};
-use veil_parsers::{DocumentMetadata, FileFormat, ParseResult, Position, TextSegment};
+use veil_types::{DocumentMetadata, FileFormat, ParseResult, ParseWarning, Position, TextSegment};
 
 use super::cell_ref::CellReference;
 
 /// Parse an XLSX file and extract all text content.
 pub fn parse_xlsx<R: Read + Seek + BufRead + Clone>(reader: R) -> Result<ParseResult> {
     let start = Instant::now();
+    let mut warnings = Vec::new();
 
     // Security validation before passing the reader to calamine.
     // XLSX is a ZIP-based format, so we can enforce ZIP bomb/path traversal limits.
@@ -31,8 +32,8 @@ pub fn parse_xlsx<R: Read + Seek + BufRead + Clone>(reader: R) -> Result<ParseRe
             return Err(OfficeError::Encrypted);
         }
 
-        let hidden_sheets = extract_hidden_sheet_map(&mut archive);
-        let metadata = extract_metadata(&mut archive);
+        let hidden_sheets = extract_hidden_sheet_map(&mut archive, &mut warnings);
+        let metadata = extract_metadata(&mut archive, &mut warnings);
         (hidden_sheets, metadata)
     };
 
@@ -103,13 +104,16 @@ pub fn parse_xlsx<R: Read + Seek + BufRead + Clone>(reader: R) -> Result<ParseRe
             encoding_lossy: false,
         },
         segments,
-        warnings: Vec::new(),
+        warnings,
         total_chars,
         duration_ms,
     })
 }
 
-fn extract_hidden_sheet_map<R: Read + Seek>(archive: &mut ZipArchive<R>) -> HashMap<String, bool> {
+fn extract_hidden_sheet_map<R: Read + Seek>(
+    archive: &mut ZipArchive<R>,
+    warnings: &mut Vec<ParseWarning>,
+) -> HashMap<String, bool> {
     let mut hidden_sheets = HashMap::new();
 
     let file = match archive.by_name("xl/workbook.xml") {
@@ -148,7 +152,10 @@ fn extract_hidden_sheet_map<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Hash
                 }
             }
             Ok(Event::Eof) => break,
-            Err(_) => break,
+            Err(_) => {
+                warnings.push(crate::warnings::xml_parse_warning("xl/workbook.xml"));
+                break;
+            }
             _ => {}
         }
         buf.clear();
@@ -157,17 +164,27 @@ fn extract_hidden_sheet_map<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Hash
     hidden_sheets
 }
 
-fn extract_metadata<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Option<OfficeMetadata> {
+fn extract_metadata<R: Read + Seek>(
+    archive: &mut ZipArchive<R>,
+    warnings: &mut Vec<ParseWarning>,
+) -> Option<OfficeMetadata> {
     let mut metadata = OfficeMetadata::new();
 
     // Parse core.xml
     if let Ok(file) = archive.by_name("docProps/core.xml") {
-        metadata = parse_core_xml(std::io::BufReader::new(file));
+        let (parsed, mut parsed_warnings) =
+            parse_core_xml("docProps/core.xml", std::io::BufReader::new(file));
+        metadata = parsed;
+        warnings.append(&mut parsed_warnings);
     }
 
     // Parse app.xml
     if let Ok(file) = archive.by_name("docProps/app.xml") {
-        parse_app_xml(std::io::BufReader::new(file), &mut metadata);
+        warnings.extend(parse_app_xml(
+            "docProps/app.xml",
+            std::io::BufReader::new(file),
+            &mut metadata,
+        ));
     }
 
     if metadata.is_empty() {
@@ -278,7 +295,9 @@ mod tests {
         let zip_bytes = build_xlsx_zip(vec![("xl/workbook.xml", workbook)]);
         let mut archive = ZipArchive::new(Cursor::new(zip_bytes)).unwrap();
 
-        let hidden = extract_hidden_sheet_map(&mut archive);
+        let mut warnings = Vec::new();
+        let hidden = extract_hidden_sheet_map(&mut archive, &mut warnings);
+        assert!(warnings.is_empty());
         assert_eq!(hidden.get("Visible").copied(), Some(false));
         assert_eq!(hidden.get("Hidden").copied(), Some(true));
         assert_eq!(hidden.get("VeryHidden").copied(), Some(true));
@@ -311,7 +330,9 @@ mod tests {
         ]);
         let mut archive = ZipArchive::new(Cursor::new(zip_bytes)).unwrap();
 
-        let metadata = extract_metadata(&mut archive).unwrap();
+        let mut warnings = Vec::new();
+        let metadata = extract_metadata(&mut archive, &mut warnings).unwrap();
+        assert!(warnings.is_empty());
         assert_eq!(metadata.title.as_deref(), Some("Test Spreadsheet"));
         assert_eq!(metadata.creator.as_deref(), Some("Jane Doe"));
         assert_eq!(metadata.company.as_deref(), Some("Acme Corp"));

@@ -12,8 +12,8 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use veil_detect::{DetectorRegistry, Finding};
+use veil_fs::{walk_files, WalkFilesOptions};
 use veil_parsers::ParseOptions;
-use walkdir::WalkDir;
 
 /// Filesystem scanner that discovers PII in files.
 pub struct Scanner {
@@ -78,23 +78,18 @@ impl Scanner {
         let mut errors = Vec::new();
         let mut statistics = ScanStatistics::default();
 
-        // Configure walkdir
-        let mut walker =
-            WalkDir::new(&self.options.root_path).follow_links(self.options.follow_symlinks);
-
-        if let Some(max_depth) = self.options.max_depth {
-            walker = walker.max_depth(max_depth);
-        }
+        let walker = walk_files(
+            &self.options.root_path,
+            WalkFilesOptions {
+                follow_symlinks: self.options.follow_symlinks,
+                max_depth: self.options.max_depth,
+            },
+        );
 
         // Scan files
         for entry in walker {
             match entry {
                 Ok(entry) => {
-                    // Skip directories
-                    if entry.file_type().is_dir() {
-                        continue;
-                    }
-
                     let path = entry.path();
 
                     // Check if path matches patterns

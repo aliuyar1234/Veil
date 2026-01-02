@@ -9,6 +9,7 @@ use miette::{IntoDiagnostic, Result};
 use veil_core::DEFAULT_MAX_FILE_SIZE;
 use veil_detect::DetectorRegistry;
 use veil_email::{parse_email_to_result, EmailParseOptions};
+use veil_fs::{walk_files, WalkFilesOptions};
 use veil_office::{parse_docx, parse_pptx, parse_xlsx};
 use veil_parsers::{parse_file, FileFormat, ParseOptions, ParseResult};
 use veil_policy::{apply_policy_to_findings, default_policy, load_policy};
@@ -283,47 +284,42 @@ fn scan_directory(
     include_values: bool,
     results: &mut Vec<ScanResult>,
 ) -> Result<()> {
-    for entry in fs::read_dir(dir).into_diagnostic()? {
-        let entry = entry.into_diagnostic()?;
+    let walk_options = WalkFilesOptions {
+        follow_symlinks: false,
+        max_depth: None,
+    };
+
+    for entry in walk_files(dir, walk_options) {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(e) => {
+                if !quiet && !json {
+                    eprintln!("Warning: Failed to access path: {}", e);
+                }
+                continue;
+            }
+        };
+
         let path = entry.path();
 
-        let file_type = entry.file_type().into_diagnostic()?;
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
 
-        // Avoid recursion loops and special filesystem entries (symlinks/junctions).
-        if file_type.is_symlink() {
-            continue;
-        }
+        // Check if file type is supported
+        let supported = TEXT_EXTENSIONS.contains(&ext.as_str())
+            || OFFICE_EXTENSIONS.contains(&ext.as_str())
+            || EMAIL_EXTENSIONS.contains(&ext.as_str())
+            || PDF_EXTENSIONS.contains(&ext.as_str());
 
-        if file_type.is_dir() {
-            scan_directory(
-                &path,
-                registry,
-                policy,
-                quiet,
-                json,
-                include_values,
-                results,
-            )?;
-        } else {
-            let ext = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("")
-                .to_lowercase();
-
-            // Check if file type is supported
-            let supported = TEXT_EXTENSIONS.contains(&ext.as_str())
-                || OFFICE_EXTENSIONS.contains(&ext.as_str())
-                || EMAIL_EXTENSIONS.contains(&ext.as_str())
-                || PDF_EXTENSIONS.contains(&ext.as_str());
-
-            if supported {
-                match scan_file(&path, registry, policy, quiet, include_values) {
-                    Ok(result) => results.push(result),
-                    Err(e) => {
-                        if !quiet && !json {
-                            eprintln!("Error scanning {}: {}", path.display(), e);
-                        }
+        if supported {
+            match scan_file(path, registry, policy, quiet, include_values) {
+                Ok(result) => results.push(result),
+                Err(e) => {
+                    if !quiet && !json {
+                        eprintln!("Error scanning {}: {}", path.display(), e);
                     }
                 }
             }
