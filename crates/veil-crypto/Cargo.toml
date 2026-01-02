@@ -8,7 +8,7 @@ repository.workspace = true
 
 [dependencies]
 # Workspace crates
-veil-core = { path = "../veil-core" }
+veil-core = { path = "../veil-core", version = "0.1.0" }
 
 # Serialization
 serde.workspace = true

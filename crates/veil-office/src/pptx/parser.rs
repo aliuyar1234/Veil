@@ -9,6 +9,7 @@ use zip::ZipArchive;
 
 use crate::error::{OfficeError, Result};
 use crate::metadata::{parse_app_xml, parse_core_xml, OfficeMetadata};
+use crate::security::{is_encrypted, validate_archive, SecurityLimits};
 use veil_parsers::{DocumentMetadata, FileFormat, ParseResult, Position, TextSegment};
 
 /// Element types in PowerPoint presentations.
@@ -44,6 +45,10 @@ pub fn parse_pptx<R: Read + Seek>(reader: R) -> Result<ParseResult> {
     let start = Instant::now();
 
     let mut archive = ZipArchive::new(reader)?;
+    validate_archive(&mut archive, &SecurityLimits::default())?;
+    if is_encrypted(&mut archive) {
+        return Err(OfficeError::Encrypted);
+    }
 
     // Verify this is a valid PPTX
     if archive.by_name("ppt/presentation.xml").is_err() {
@@ -292,5 +297,42 @@ fn extract_metadata<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Option<Offic
         None
     } else {
         Some(metadata)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Cursor, Write};
+    use zip::write::FileOptions;
+    use zip::{CompressionMethod, ZipWriter};
+
+    fn build_pptx_zip(entries: Vec<(&str, Vec<u8>)>) -> Vec<u8> {
+        let mut buf = Cursor::new(Vec::new());
+        {
+            let mut zip = ZipWriter::new(&mut buf);
+
+            let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
+            for (name, data) in entries {
+                zip.start_file(name, options).unwrap();
+                zip.write_all(&data).unwrap();
+            }
+            zip.finish().unwrap();
+        }
+        buf.into_inner()
+    }
+
+    #[test]
+    fn parse_pptx_rejects_zip_bomb() {
+        let presentation = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"></p:presentation>"#.to_vec();
+        let bomb = vec![0u8; 2 * 1024 * 1024];
+
+        let zip_bytes = build_pptx_zip(vec![
+            ("ppt/presentation.xml", presentation),
+            ("ppt/media/bomb.bin", bomb),
+        ]);
+
+        let err = parse_pptx(Cursor::new(zip_bytes)).unwrap_err();
+        assert!(matches!(err, OfficeError::ZipBomb { .. }));
     }
 }

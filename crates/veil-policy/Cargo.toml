@@ -8,12 +8,13 @@ keywords = ["pii", "privacy", "policy", "yaml"]
 categories = ["config"]
 
 [dependencies]
-veil-detect = { path = "../veil-detect" }
-veil-redact = { path = "../veil-redact" }
-veil-crypto = { path = "../veil-crypto" }
+veil-detect = { path = "../veil-detect", version = "0.1.0" }
+veil-redact = { path = "../veil-redact", version = "0.1.0" }
+veil-crypto = { path = "../veil-crypto", version = "0.1.0" }
 serde.workspace = true
 serde_yaml.workspace = true
 thiserror.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 pretty_assertions.workspace = true

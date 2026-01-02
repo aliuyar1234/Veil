@@ -22,11 +22,11 @@ thiserror = { workspace = true }
 serde = { workspace = true }
 
 # Integration with veil-parsers
-veil-parsers = { path = "../veil-parsers" }
+veil-parsers = { path = "../veil-parsers", version = "0.1.0" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
-veil-detect = { path = "../veil-detect" }
+veil-detect = { path = "../veil-detect", version = "0.1.0" }
 
 [features]
 default = []

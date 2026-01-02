@@ -19,9 +19,9 @@ zip = { workspace = true }
 quick-xml = { workspace = true }
 
 # Re-export veil-parsers types
-veil-parsers = { path = "../veil-parsers" }
+veil-parsers = { path = "../veil-parsers", version = "0.1.0" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
 pretty_assertions = { workspace = true }
-veil-detect = { path = "../veil-detect" }
+veil-detect = { path = "../veil-detect", version = "0.1.0" }

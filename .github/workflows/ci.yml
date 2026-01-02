@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
@@ -17,17 +20,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-14, windows-2022]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
         with:
           components: clippy, rustfmt
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -45,17 +48,17 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
         with:
           components: clippy, rustfmt
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -73,20 +76,20 @@ jobs:
 
   wasm:
     name: WASM Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
         with:
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: cargo install wasm-pack --version 0.13.1 --locked
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -101,15 +104,15 @@ jobs:
 
   docs:
     name: Documentation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -126,32 +129,44 @@ jobs:
 
   security:
     name: Security Audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit
+        run: cargo install cargo-audit --version 0.22.0 --locked
 
       - name: Run security audit
         run: cargo audit
 
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --version 0.18.9 --locked
+
+      - name: Run cargo-deny
+        run: cargo deny check
+
+      - name: Install detect-secrets
+        run: python -m pip install detect-secrets==1.4.0
+
+      - name: Secret scan (detect-secrets)
+        run: python -m detect_secrets.pre_commit_hook --baseline .secrets.baseline --exclude-files 'Cargo\\.lock|\\.secrets\\.baseline' $(git ls-files)
+
   coverage:
     name: Code Coverage
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
         with:
           components: llvm-tools-preview
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+        uses: taiki-e/install-action@9fef977cc78d9c6fecc249b5ee8f282a3a603584
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -166,34 +181,44 @@ jobs:
 
       - name: Check coverage threshold (90%)
         run: |
-          COVERAGE=$(cargo llvm-cov --workspace --all-features --json | jq '.data[0].totals.lines.percent')
-          echo "Coverage: $COVERAGE%"
-          if (( $(echo "$COVERAGE < 90" | bc -l) )); then
-            echo "::warning::Coverage is below 90% threshold: $COVERAGE%"
-          fi
+          python - <<'PY'
+          import json
+          import subprocess
+          import sys
+
+          out = subprocess.check_output(
+              ["cargo", "llvm-cov", "--workspace", "--all-features", "--json"],
+              text=True,
+          )
+          data = json.loads(out)
+          coverage = float(data["data"][0]["totals"]["lines"]["percent"])
+          print(f"Coverage: {coverage:.2f}%")
+          if coverage < 90:
+              print(f"::warning::Coverage is below 90% threshold: {coverage:.2f}%")
+          PY
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@9fd7d16f6d7d1b5d2bec1a2887e65ceed900238
         with:
           files: lcov.info
           fail_ci_if_error: false
 
   mutation:
     name: Mutation Testing
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Only run on main branch to save CI time
     if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
 
       - name: Install cargo-mutants
-        run: cargo install cargo-mutants
+        run: cargo install cargo-mutants --version 26.0.0 --locked
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -206,9 +231,18 @@ jobs:
       - name: Run mutation testing
         run: |
           cargo mutants --workspace --timeout 300 -- --all-features 2>&1 | tee mutants.log
-          # Extract mutation score
-          SCORE=$(grep -oP 'mutation score: \K[\d.]+' mutants.log || echo "0")
-          echo "Mutation score: $SCORE%"
-          if (( $(echo "$SCORE < 80" | bc -l) )); then
-            echo "::warning::Mutation score is below 80% threshold: $SCORE%"
-          fi
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("mutants.log").read_text(encoding="utf-8", errors="replace")
+          match = re.search(
+              r"mutation score:\\s*([0-9]+(?:\\.[0-9]+)?)",
+              text,
+              flags=re.IGNORECASE,
+          )
+          score = float(match.group(1)) if match else 0.0
+          print(f"Mutation score: {score:.2f}%")
+          if score < 80:
+              print(f"::warning::Mutation score is below 80% threshold: {score:.2f}%")
+          PY

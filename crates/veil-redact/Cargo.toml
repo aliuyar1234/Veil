@@ -8,14 +8,15 @@ keywords = ["pii", "privacy", "redaction", "masking"]
 categories = ["text-processing"]
 
 [dependencies]
-veil-detect = { path = "../veil-detect" }
+veil-detect = { path = "../veil-detect", version = "0.1.0" }
 serde.workspace = true
 thiserror.workspace = true
 sha2.workspace = true
 hex.workspace = true
+hmac.workspace = true
 
 [dev-dependencies]
 pretty_assertions.workspace = true
 proptest.workspace = true
 serde_json.workspace = true
-veil-core = { path = "../veil-core" }
+veil-core = { path = "../veil-core", version = "0.1.0" }

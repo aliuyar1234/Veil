@@ -1,13 +1,19 @@
 //! Dictionary registry for managing loaded dictionaries.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::category::{DictionaryCategory, Locale};
 use super::dictionary::Dictionary;
 use super::error::DictionaryError;
 use super::loader::{load_dictionary_from_file, DictionaryLoadConfig};
+
+#[derive(Debug, Clone)]
+struct DictionarySource {
+    path: PathBuf,
+    config: DictionaryLoadConfig,
+}
 
 /// Central registry managing all loaded dictionaries.
 #[derive(Debug, Default)]
@@ -20,6 +26,9 @@ pub struct DictionaryRegistry {
 
     /// Index by locale.
     by_locale: HashMap<Locale, Vec<String>>,
+
+    /// Source information for dictionaries loaded from files.
+    sources: HashMap<String, DictionarySource>,
 }
 
 impl DictionaryRegistry {
@@ -61,9 +70,19 @@ impl DictionaryRegistry {
         path: &Path,
         config: DictionaryLoadConfig,
     ) -> Result<String, DictionaryError> {
+        let config_clone = config.clone();
         let dictionary = load_dictionary_from_file(path, config)?;
         let id = dictionary.id.clone();
         self.register(dictionary)?;
+
+        self.sources.insert(
+            id.clone(),
+            DictionarySource {
+                path: path.to_path_buf(),
+                config: config_clone,
+            },
+        );
+
         Ok(id)
     }
 
@@ -81,6 +100,8 @@ impl DictionaryRegistry {
             if let Some(ids) = self.by_locale.get_mut(&dict.locale) {
                 ids.retain(|i| i != id);
             }
+
+            self.sources.remove(id);
 
             true
         } else {
@@ -150,16 +171,62 @@ impl DictionaryRegistry {
     }
 
     /// Reload a dictionary from its source.
-    ///
-    /// Note: This requires storing the source path, which is not currently implemented.
-    /// For now, this just returns NotFound.
     pub fn reload(&mut self, id: &str) -> Result<(), DictionaryError> {
-        if !self.dictionaries.contains_key(id) {
+        let Some(source) = self.sources.get(id) else {
+            if self.dictionaries.contains_key(id) {
+                return Err(DictionaryError::ConfigError(format!(
+                    "No source stored for dictionary: {}",
+                    id
+                )));
+            }
             return Err(DictionaryError::NotFound(id.to_string()));
+        };
+
+        let dictionary = load_dictionary_from_file(&source.path, source.config.clone())?;
+        if dictionary.id != id {
+            return Err(DictionaryError::ConfigError(format!(
+                "Reloaded dictionary id mismatch: expected {}, got {}",
+                id, dictionary.id
+            )));
         }
 
-        // TODO: Implement reload by storing source paths
-        // For now, just verify the dictionary exists
+        let old = self
+            .dictionaries
+            .get(id)
+            .ok_or_else(|| DictionaryError::NotFound(id.to_string()))?
+            .clone();
+
+        if old.category != dictionary.category {
+            if let Some(ids) = self.by_category.get_mut(&old.category) {
+                ids.retain(|i| i != id);
+            }
+            self.by_category
+                .entry(dictionary.category.clone())
+                .or_default()
+                .retain(|i| i != id);
+            self.by_category
+                .entry(dictionary.category.clone())
+                .or_default()
+                .push(id.to_string());
+        }
+
+        if old.locale != dictionary.locale {
+            if let Some(ids) = self.by_locale.get_mut(&old.locale) {
+                ids.retain(|i| i != id);
+            }
+            self.by_locale
+                .entry(dictionary.locale)
+                .or_default()
+                .retain(|i| i != id);
+            self.by_locale
+                .entry(dictionary.locale)
+                .or_default()
+                .push(id.to_string());
+        }
+
+        self.dictionaries
+            .insert(id.to_string(), Arc::new(dictionary));
+
         Ok(())
     }
 }
@@ -168,6 +235,8 @@ impl DictionaryRegistry {
 mod tests {
     use super::*;
     use crate::dictionary::entry::DictionaryEntry;
+    use std::fs;
+    use tempfile::TempDir;
 
     fn sample_dictionary(id: &str, category: DictionaryCategory, locale: Locale) -> Dictionary {
         Dictionary::new(
@@ -283,5 +352,40 @@ mod tests {
 
         let at_dicts = registry.by_locale(Locale::At);
         assert_eq!(at_dicts.len(), 1);
+    }
+
+    #[test]
+    fn reload_updates_loaded_dictionary_from_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path().join("names.txt");
+
+        fs::write(&path, "Alice\nBob\n").unwrap();
+
+        let mut registry = DictionaryRegistry::new();
+        let config = DictionaryLoadConfig::new(DictionaryCategory::FirstName, Locale::De);
+        let id = registry.load(&path, config).unwrap();
+
+        assert!(registry.get(&id).unwrap().contains("Alice"));
+        assert!(!registry.get(&id).unwrap().contains("Charlie"));
+
+        fs::write(&path, "Alice\nBob\nCharlie\n").unwrap();
+        registry.reload(&id).unwrap();
+
+        assert!(registry.get(&id).unwrap().contains("Charlie"));
+    }
+
+    #[test]
+    fn reload_fails_without_source() {
+        let mut registry = DictionaryRegistry::new();
+        registry
+            .register(sample_dictionary(
+                "test",
+                DictionaryCategory::FirstName,
+                Locale::De,
+            ))
+            .unwrap();
+
+        let err = registry.reload("test").unwrap_err();
+        assert!(matches!(err, DictionaryError::ConfigError(_)));
     }
 }

@@ -10,9 +10,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Workspace crates
-veil-parsers = { path = "../veil-parsers" }
-veil-detect = { path = "../veil-detect" }
-veil-redact = { path = "../veil-redact" }
+veil-parsers = { path = "../veil-parsers", version = "0.1.0" }
+veil-detect = { path = "../veil-detect", version = "0.1.0" }
+veil-redact = { path = "../veil-redact", version = "0.1.0" }
 
 # Serialization
 serde.workspace = true

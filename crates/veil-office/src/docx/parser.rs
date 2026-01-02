@@ -9,6 +9,7 @@ use zip::ZipArchive;
 
 use crate::error::{OfficeError, Result};
 use crate::metadata::{parse_app_xml, parse_core_xml, OfficeMetadata};
+use crate::security::{is_encrypted, validate_archive, SecurityLimits};
 use veil_parsers::{DocumentMetadata, FileFormat, ParseResult, Position, TableCell, TextSegment};
 
 /// Document section types in Word documents.
@@ -53,6 +54,10 @@ pub fn parse_docx<R: Read + Seek>(reader: R) -> Result<ParseResult> {
     let start = Instant::now();
 
     let mut archive = ZipArchive::new(reader)?;
+    validate_archive(&mut archive, &SecurityLimits::default())?;
+    if is_encrypted(&mut archive) {
+        return Err(OfficeError::Encrypted);
+    }
 
     // Verify this is a valid DOCX
     if archive.by_name("word/document.xml").is_err() {
@@ -317,5 +322,63 @@ fn extract_metadata<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Option<Offic
         None
     } else {
         Some(metadata)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Cursor, Write};
+    use zip::write::FileOptions;
+    use zip::{CompressionMethod, ZipWriter};
+
+    fn build_docx_zip(entries: Vec<(&str, Vec<u8>)>) -> Vec<u8> {
+        let mut buf = Cursor::new(Vec::new());
+        {
+            let mut zip = ZipWriter::new(&mut buf);
+
+            let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
+            for (name, data) in entries {
+                zip.start_file(name, options).unwrap();
+                zip.write_all(&data).unwrap();
+            }
+            zip.finish().unwrap();
+        }
+        buf.into_inner()
+    }
+
+    #[test]
+    fn parse_docx_parses_minimal_document() {
+        let xml = br#"
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+              <w:body>
+                <w:p><w:r><w:t>Hello</w:t></w:r></w:p>
+              </w:body>
+            </w:document>
+        "#
+        .to_vec();
+
+        let zip_bytes = build_docx_zip(vec![("word/document.xml", xml)]);
+        let result = parse_docx(Cursor::new(zip_bytes)).unwrap();
+
+        assert_eq!(result.metadata.format, FileFormat::Docx);
+        assert!(result
+            .segments
+            .iter()
+            .any(|s| s.content.as_str().contains("Hello")));
+    }
+
+    #[test]
+    fn parse_docx_rejects_zip_bomb() {
+        let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:t>x</w:t></w:p></w:body></w:document>"#.to_vec();
+        let bomb = vec![0u8; 2 * 1024 * 1024];
+
+        let zip_bytes = build_docx_zip(vec![
+            ("word/document.xml", xml),
+            ("word/media/bomb.bin", bomb),
+        ]);
+
+        let err = parse_docx(Cursor::new(zip_bytes)).unwrap_err();
+        assert!(matches!(err, OfficeError::ZipBomb { .. }));
     }
 }

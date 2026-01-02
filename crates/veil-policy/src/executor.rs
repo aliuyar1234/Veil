@@ -6,6 +6,7 @@ use std::time::Instant;
 
 use veil_crypto::{InMemoryVault, TokenVault};
 use veil_detect::Finding;
+use zeroize::Zeroize;
 
 use crate::apply::apply_policy_to_findings;
 use crate::error::PolicyError;
@@ -188,6 +189,14 @@ impl PolicyExecutor {
         }
 
         Ok(protected)
+    }
+}
+
+impl Drop for PolicyExecutor {
+    fn drop(&mut self) {
+        if let Some(key) = &mut self.encryption_key {
+            key.zeroize();
+        }
     }
 }
 

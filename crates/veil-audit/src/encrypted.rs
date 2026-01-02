@@ -8,17 +8,18 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 
 use chrono::NaiveDate;
+use zeroize::Zeroizing;
 
-use crate::checksum::calculate_checksum;
+use crate::checksum::calculate_checksum_hmac;
 use crate::entry::AuditEntry;
 use crate::error::AuditError;
 use crate::logger::AuditFilter;
 
 /// Configuration for encrypted audit logging.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct EncryptionConfig {
     /// 256-bit AES key (32 bytes).
-    key: Vec<u8>,
+    key: Zeroizing<Vec<u8>>,
 }
 
 impl EncryptionConfig {
@@ -36,12 +37,22 @@ impl EncryptionConfig {
                 actual: key.len(),
             });
         }
-        Ok(Self { key })
+        Ok(Self {
+            key: Zeroizing::new(key),
+        })
     }
 
     /// Get the encryption key.
     pub fn key(&self) -> &[u8] {
-        &self.key
+        self.key.as_slice()
+    }
+}
+
+impl std::fmt::Debug for EncryptionConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EncryptionConfig")
+            .field("key", &"[REDACTED]")
+            .finish()
     }
 }
 
@@ -91,7 +102,7 @@ impl EncryptedAuditLogger {
         entry.previous_checksum = self.last_checksum.take();
 
         // Calculate checksum before encryption
-        entry.checksum = calculate_checksum(&entry);
+        entry.checksum = calculate_checksum_hmac(&entry, self.config.key())?;
 
         // Serialize entry
         let json = serde_json::to_string(&entry)?;
@@ -235,7 +246,8 @@ fn encrypt_string(plaintext: &str, config: &EncryptionConfig) -> Result<String, 
     {
         use veil_crypto::{encrypt, EncryptionConfig as CryptoConfig, OutputFormat};
 
-        let crypto_config = CryptoConfig::with_format(config.key.clone(), OutputFormat::Base64);
+        let crypto_config =
+            CryptoConfig::with_format(config.key.as_slice().to_vec(), OutputFormat::Base64);
 
         let result = encrypt(plaintext.as_bytes(), &crypto_config).map_err(|e| {
             AuditError::Io(std::io::Error::other(format!("Encryption failed: {}", e)))
@@ -260,7 +272,8 @@ fn decrypt_string(ciphertext: &str, config: &EncryptionConfig) -> Result<String,
             decrypt, CryptoResult, EncryptionConfig as CryptoConfig, OutputFormat, ProtectionMode,
         };
 
-        let crypto_config = CryptoConfig::with_format(config.key.clone(), OutputFormat::Base64);
+        let crypto_config =
+            CryptoConfig::with_format(config.key.as_slice().to_vec(), OutputFormat::Base64);
 
         let result = CryptoResult::new(ciphertext.to_string(), ProtectionMode::Encrypt);
 

@@ -6,6 +6,7 @@ use std::path::Path;
 
 use miette::{IntoDiagnostic, Result};
 
+use veil_core::DEFAULT_MAX_FILE_SIZE;
 use veil_detect::DetectorRegistry;
 use veil_email::{parse_email_to_result, EmailParseOptions};
 use veil_office::{parse_docx, parse_pptx, parse_xlsx};
@@ -151,6 +152,8 @@ fn scan_file(
         eprintln!("Scanning: {}", path.display());
     }
 
+    enforce_max_input_size(path)?;
+
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
@@ -196,6 +199,21 @@ fn scan_file(
         findings_count: finding_outputs.len(),
         findings: finding_outputs,
     })
+}
+
+fn enforce_max_input_size(path: &Path) -> Result<()> {
+    let size = std::fs::metadata(path).into_diagnostic()?.len();
+    let max = DEFAULT_MAX_FILE_SIZE as u64;
+
+    if size > max {
+        return Err(miette::miette!(
+            "File too large: {} bytes (max: {} bytes)",
+            size,
+            max
+        ));
+    }
+
+    Ok(())
 }
 
 fn parse_office_file(path: &Path) -> Result<(ParseResult, String)> {
@@ -269,7 +287,14 @@ fn scan_directory(
         let entry = entry.into_diagnostic()?;
         let path = entry.path();
 
-        if path.is_dir() {
+        let file_type = entry.file_type().into_diagnostic()?;
+
+        // Avoid recursion loops and special filesystem entries (symlinks/junctions).
+        if file_type.is_symlink() {
+            continue;
+        }
+
+        if file_type.is_dir() {
             scan_directory(
                 &path,
                 registry,
@@ -306,4 +331,21 @@ fn scan_directory(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn enforce_max_input_size_rejects_large_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("big.bin");
+
+        let file = std::fs::File::create(&file_path).unwrap();
+        file.set_len(DEFAULT_MAX_FILE_SIZE as u64 + 1).unwrap();
+
+        assert!(enforce_max_input_size(&file_path).is_err());
+    }
 }

@@ -27,7 +27,7 @@ const VAULT_VERSION: u8 = 1;
 const NONCE_SIZE: usize = 12;
 
 /// An encrypted entry in the vault.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct EncryptedEntry {
     /// AES-GCM nonce for this entry.
     nonce: [u8; NONCE_SIZE],
@@ -36,14 +36,14 @@ struct EncryptedEntry {
 }
 
 /// Decrypted entry for internal use.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct PlaintextEntry {
     token: String,
     original: String,
 }
 
 /// On-disk format for the encrypted vault.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct VaultFile {
     /// Format version.
     version: u8,

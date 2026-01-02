@@ -53,7 +53,7 @@ fn create_secure_file(path: &Path) -> Result<File, VaultError> {
 }
 
 /// A token entry stored in the vault file.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct TokenEntry {
     token: String,
     original: String,
@@ -67,7 +67,6 @@ struct TokenEntry {
 /// # Security
 /// Plaintext storage is disabled by default. Set
 /// `VEIL_ALLOW_PLAINTEXT_STORAGE=1` to enable.
-#[derive(Debug)]
 pub struct FileVault {
     /// Path to the vault file.
     path: PathBuf,
@@ -75,6 +74,19 @@ pub struct FileVault {
     tokens: RwLock<HashMap<String, String>>,
     /// In-memory original to token mapping (for consistency lookups).
     reverse: RwLock<HashMap<String, String>>,
+}
+
+impl std::fmt::Debug for FileVault {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let token_count = self.tokens.read().map(|t| t.len()).unwrap_or(0);
+        let reverse_count = self.reverse.read().map(|r| r.len()).unwrap_or(0);
+
+        f.debug_struct("FileVault")
+            .field("path", &self.path)
+            .field("token_count", &token_count)
+            .field("reverse_count", &reverse_count)
+            .finish()
+    }
 }
 
 impl FileVault {

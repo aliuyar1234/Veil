@@ -9,8 +9,8 @@ categories = ["text-processing"]
 
 [dependencies]
 # Veil crates
-veil-detect = { path = "../veil-detect" }
-veil-parsers = { path = "../veil-parsers" }
+veil-detect = { path = "../veil-detect", version = "0.1.0" }
+veil-parsers = { path = "../veil-parsers", version = "0.1.0" }
 
 # Core
 serde.workspace = true

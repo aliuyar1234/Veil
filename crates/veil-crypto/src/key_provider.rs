@@ -143,7 +143,7 @@ pub trait KeyProvider: Send + Sync {
 }
 
 /// File entry for persistent key storage.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct KeyEntry {
     key_id: String,
     version: u32,
@@ -162,10 +162,19 @@ struct KeyEntry {
 /// - Disabled by default; set `VEIL_ALLOW_PLAINTEXT_STORAGE=1` to enable
 /// - Suitable for development and single-node deployments
 /// - For production, consider using a KMS-backed provider
-#[derive(Debug)]
 pub struct LocalKeyProvider {
     path: PathBuf,
     keys: RwLock<HashMap<String, KeyEntry>>,
+}
+
+impl std::fmt::Debug for LocalKeyProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let key_count = self.keys.read().map(|k| k.len()).unwrap_or(0);
+        f.debug_struct("LocalKeyProvider")
+            .field("path", &self.path)
+            .field("key_count", &key_count)
+            .finish()
+    }
 }
 
 impl LocalKeyProvider {

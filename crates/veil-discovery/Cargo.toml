@@ -6,8 +6,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-veil-parsers = { path = "../veil-parsers" }
-veil-detect = { path = "../veil-detect" }
+veil-parsers = { path = "../veil-parsers", version = "0.1.0" }
+veil-detect = { path = "../veil-detect", version = "0.1.0" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

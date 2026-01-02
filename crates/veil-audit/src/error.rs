@@ -25,14 +25,18 @@ pub enum AuditError {
     #[error("Log directory not found: {0}")]
     DirectoryNotFound(String),
 
-    /// Invalid encryption key.
-    #[error("Invalid encryption key: expected {expected} bytes, got {actual} bytes")]
+    /// Invalid key.
+    #[error("Invalid key: expected {expected} bytes, got {actual} bytes")]
     InvalidKey {
         /// Expected key length.
         expected: usize,
         /// Actual key length provided.
         actual: usize,
     },
+
+    /// Missing integrity key for HMAC-based verification.
+    #[error("Missing audit integrity key; set VEIL_AUDIT_HMAC_KEY_HEX or use a keyed audit logger constructor")]
+    MissingIntegrityKey,
 
     /// Encryption feature is disabled.
     #[error("Encryption is disabled; enable the `encryption` feature to use encrypted audit logs")]

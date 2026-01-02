@@ -109,7 +109,7 @@ use std::path::PathBuf;
 let mut options = BatchOptions::default();
 
 // Set password for encrypted archives
-options.archive_password = Some("secret".to_string());
+options.archive_password = Some("example-password".to_string());
 
 // Limit archive nesting depth (default: 5)
 options.max_archive_depth = 3;
@@ -130,7 +130,7 @@ options.max_parallelism = Some(4); // Use 4 threads (default: CPU count - 1)
 
 // Directory traversal
 options.recursive = true;          // Recursive scanning (default: true)
-options.follow_symlinks = true;    // Follow symlinks (default: true)
+options.follow_symlinks = true;    // Follow symlinks (default: false)
 options.max_depth = Some(5);       // Limit depth (default: unlimited)
 
 // File size limits

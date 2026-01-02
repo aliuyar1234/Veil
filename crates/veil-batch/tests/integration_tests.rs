@@ -64,7 +64,7 @@ fn test_nonexistent_path() {
 #[test]
 fn test_batch_options_defaults() {
     let options = BatchOptions::default();
-    assert!(options.follow_symlinks);
+    assert!(!options.follow_symlinks);
     assert!(options.recursive);
     assert_eq!(options.max_archive_depth, 5);
     assert_eq!(options.max_file_size, 100 * 1024 * 1024);

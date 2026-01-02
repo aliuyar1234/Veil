@@ -13,7 +13,7 @@ pub struct BatchOptions {
     /// Maximum number of parallel workers (default: CPU count - 1).
     pub max_parallelism: Option<usize>,
 
-    /// Follow symbolic links (default: true).
+    /// Follow symbolic links (default: false).
     pub follow_symlinks: bool,
 
     /// Maximum directory depth to traverse (default: unlimited).
@@ -45,7 +45,7 @@ impl Default for BatchOptions {
     fn default() -> Self {
         Self {
             max_parallelism: None, // Will default to CPU count - 1
-            follow_symlinks: true,
+            follow_symlinks: false,
             max_depth: None,
             max_archive_depth: 5,
             max_file_size: 100 * 1024 * 1024, // 100MB

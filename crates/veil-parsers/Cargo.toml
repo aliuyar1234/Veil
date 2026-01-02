@@ -12,7 +12,7 @@ default = ["pdf"]
 pdf = ["dep:pdf-extract"]
 
 [dependencies]
-veil-core = { path = "../veil-core" }
+veil-core = { path = "../veil-core", version = "0.1.0" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
@@ -27,7 +27,7 @@ pdf-extract = { workspace = true, optional = true }
 pretty_assertions.workspace = true
 tempfile.workspace = true
 lopdf.workspace = true
-veil-detect = { path = "../veil-detect" }
+veil-detect = { path = "../veil-detect", version = "0.1.0" }
 proptest.workspace = true
 criterion.workspace = true
 

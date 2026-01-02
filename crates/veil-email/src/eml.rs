@@ -1,5 +1,6 @@
 //! EML file parsing implementation using mailparse.
 
+use mailparse::body::Body;
 use mailparse::{parse_mail, MailHeaderMap, ParsedMail};
 
 use crate::error::{EmailParseError, Result};
@@ -265,8 +266,8 @@ fn extract_attachments_recursive(
         // Get filename
         let filename = get_attachment_filename(parsed);
 
-        // Get size (from body if available)
-        let size_bytes = parsed.get_body_raw().map(|b| b.len()).unwrap_or(0);
+        // Get size without decoding full attachment bodies (avoid OOM/CPU for huge base64 parts).
+        let size_bytes = estimate_attachment_size_bytes(parsed);
 
         // Check size limit
         if size_bytes <= options.max_attachment_size {
@@ -290,6 +291,42 @@ fn extract_attachments_recursive(
     // Process subparts
     for subpart in &parsed.subparts {
         extract_attachments_recursive(subpart, options, attachments);
+    }
+}
+
+/// Estimate attachment size in bytes without decoding the attachment payload.
+///
+/// Prefers a declared `size=` parameter in `Content-Disposition` when present,
+/// otherwise computes an upper bound based on the transfer encoding and raw body length.
+fn estimate_attachment_size_bytes(parsed: &ParsedMail) -> usize {
+    if let Some(disposition) = parsed.headers.get_first_value("Content-Disposition") {
+        if let Some(size_str) = extract_param(&disposition, "size") {
+            if let Ok(size) = size_str.trim().parse::<usize>() {
+                return size;
+            }
+        }
+    }
+
+    approximate_decoded_body_size(parsed)
+}
+
+/// Upper bound for decoded body size based on transfer encoding.
+fn approximate_decoded_body_size(parsed: &ParsedMail) -> usize {
+    match parsed.get_body_encoded() {
+        Body::Base64(body) => {
+            // Base64 expands: decoded_len <= ceil(n/4)*3, where n is non-whitespace chars.
+            let mut n = 0usize;
+            for &b in body.get_raw() {
+                if !b.is_ascii_whitespace() {
+                    n += 1;
+                }
+            }
+            n.div_ceil(4) * 3
+        }
+        Body::QuotedPrintable(body) => body.get_raw().len(), // decoded_len <= raw_len
+        Body::SevenBit(body) => body.get_raw().len(),
+        Body::EightBit(body) => body.get_raw().len(),
+        Body::Binary(body) => body.get_raw().len(),
     }
 }
 

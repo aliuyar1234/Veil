@@ -8,9 +8,9 @@ keywords = ["pii", "privacy", "audit", "logging"]
 categories = ["development-tools"]
 
 [dependencies]
-veil-detect = { path = "../veil-detect" }
-veil-redact = { path = "../veil-redact" }
-veil-crypto = { path = "../veil-crypto", optional = true }
+veil-detect = { path = "../veil-detect", version = "0.1.0" }
+veil-redact = { path = "../veil-redact", version = "0.1.0" }
+veil-crypto = { path = "../veil-crypto", version = "0.1.0", optional = true }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
@@ -18,11 +18,14 @@ chrono.workspace = true
 sha2.workspace = true
 uuid.workspace = true
 regex.workspace = true
+hmac.workspace = true
+hex.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 pretty_assertions.workspace = true
 tempfile.workspace = true
-veil-crypto = { path = "../veil-crypto" }
+veil-crypto = { path = "../veil-crypto", version = "0.1.0" }
 
 [features]
 default = []

@@ -787,8 +787,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "335ff9f135e4384c8150d6f27c6daed433577f86b4750418338c01a1a2528592"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -798,11 +800,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
 dependencies = [
  "cfg-if",
- "js-sys",
  "libc",
  "r-efi",
  "wasip2",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -2147,6 +2147,8 @@ name = "veil-audit"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "hex",
+ "hmac",
  "pretty_assertions",
  "regex",
  "serde",
@@ -2158,6 +2160,7 @@ dependencies = [
  "veil-crypto",
  "veil-detect",
  "veil-redact",
+ "zeroize",
 ]
 
 [[package]]
@@ -2196,6 +2199,7 @@ dependencies = [
  "thiserror 2.0.17",
  "veil-audit",
  "veil-batch",
+ "veil-core",
  "veil-crypto",
  "veil-detect",
  "veil-discovery",
@@ -2257,6 +2261,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "strsim",
+ "tempfile",
  "thiserror 2.0.17",
  "unicode-normalization",
  "unicode-segmentation",
@@ -2345,6 +2350,7 @@ dependencies = [
  "veil-crypto",
  "veil-detect",
  "veil-redact",
+ "zeroize",
 ]
 
 [[package]]
@@ -2352,6 +2358,7 @@ name = "veil-redact"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "hmac",
  "pretty_assertions",
  "proptest",
  "serde",
@@ -2379,7 +2386,7 @@ dependencies = [
 name = "veil-wasm"
 version = "0.1.0"
 dependencies = [
- "getrandom 0.3.4",
+ "getrandom 0.2.16",
  "js-sys",
  "serde",
  "serde-wasm-bindgen",

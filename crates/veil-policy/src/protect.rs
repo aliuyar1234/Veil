@@ -7,6 +7,7 @@ use veil_crypto::{
     PseudonymConfig, PseudonymDataType, TokenConfig, TokenVault,
 };
 use veil_redact::MaskingRule;
+use zeroize::Zeroize;
 
 /// Character for black bar redaction.
 const BLACK_BAR_CHAR: char = '█';
@@ -102,6 +103,14 @@ impl ProtectionContext {
         self.consistent = true;
         self.seed = seed;
         self
+    }
+}
+
+impl Drop for ProtectionContext {
+    fn drop(&mut self) {
+        if let Some(key) = &mut self.encryption_key {
+            key.zeroize();
+        }
     }
 }
 

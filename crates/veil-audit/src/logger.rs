@@ -5,11 +5,14 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 
 use chrono::{DateTime, NaiveDate, Utc};
+use zeroize::Zeroizing;
 
-use crate::checksum::calculate_checksum;
+use crate::checksum::calculate_checksum_hmac;
 use crate::entry::AuditEntry;
 use crate::error::AuditError;
 use crate::operation::AuditOperation;
+
+const AUDIT_HMAC_KEY_ENV: &str = "VEIL_AUDIT_HMAC_KEY_HEX";
 
 /// Filter for querying audit logs.
 #[derive(Debug, Clone, Default)]
@@ -28,11 +31,29 @@ pub struct AuditFilter {
 pub struct AuditLogger {
     log_dir: PathBuf,
     last_checksum: Option<String>,
+    integrity_key: Zeroizing<Vec<u8>>,
 }
 
 impl AuditLogger {
     /// Create a new audit logger.
     pub fn new(log_dir: impl Into<PathBuf>) -> Result<Self, AuditError> {
+        let key = std::env::var(AUDIT_HMAC_KEY_ENV).map_err(|_| AuditError::MissingIntegrityKey)?;
+        let key_bytes = hex::decode(key.trim()).map_err(|_| AuditError::MissingIntegrityKey)?;
+        Self::new_with_key(log_dir, key_bytes)
+    }
+
+    /// Create a new audit logger with an explicit integrity key (32 bytes).
+    pub fn new_with_key(
+        log_dir: impl Into<PathBuf>,
+        integrity_key: Vec<u8>,
+    ) -> Result<Self, AuditError> {
+        if integrity_key.len() != 32 {
+            return Err(AuditError::InvalidKey {
+                expected: 32,
+                actual: integrity_key.len(),
+            });
+        }
+
         let log_dir = log_dir.into();
 
         // Create directory if it doesn't exist
@@ -46,6 +67,7 @@ impl AuditLogger {
         Ok(Self {
             log_dir,
             last_checksum,
+            integrity_key: Zeroizing::new(integrity_key),
         })
     }
 
@@ -54,8 +76,8 @@ impl AuditLogger {
         // Set previous checksum
         entry.previous_checksum = self.last_checksum.take();
 
-        // Calculate checksum
-        entry.checksum = calculate_checksum(&entry);
+        // Calculate checksum (HMAC)
+        entry.checksum = calculate_checksum_hmac(&entry, self.integrity_key.as_slice())?;
 
         // Get today's log file
         let log_file = self.get_log_file_path(entry.timestamp.date_naive());
@@ -187,10 +209,14 @@ mod tests {
     use crate::entry::{AuditOutcome, AuditParameters};
     use tempfile::TempDir;
 
+    fn test_key() -> Vec<u8> {
+        vec![0u8; 32]
+    }
+
     #[test]
     fn test_log_and_query() {
         let temp_dir = TempDir::new().unwrap();
-        let mut logger = AuditLogger::new(temp_dir.path()).unwrap();
+        let mut logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
 
         let entry = AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default());
 
@@ -206,14 +232,14 @@ mod tests {
         let log_dir = temp_dir.path().join("new_dir");
 
         assert!(!log_dir.exists());
-        let _logger = AuditLogger::new(&log_dir).unwrap();
+        let _logger = AuditLogger::new_with_key(&log_dir, test_key()).unwrap();
         assert!(log_dir.exists());
     }
 
     #[test]
     fn test_log_multiple_entries() {
         let temp_dir = TempDir::new().unwrap();
-        let mut logger = AuditLogger::new(temp_dir.path()).unwrap();
+        let mut logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
 
         for _ in 0..5 {
             let entry =
@@ -228,7 +254,7 @@ mod tests {
     #[test]
     fn test_log_with_checksums() {
         let temp_dir = TempDir::new().unwrap();
-        let mut logger = AuditLogger::new(temp_dir.path()).unwrap();
+        let mut logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
 
         let entry1 = AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default());
         logger.log(entry1).unwrap();
@@ -255,7 +281,7 @@ mod tests {
     #[test]
     fn test_query_filter_by_operation() {
         let temp_dir = TempDir::new().unwrap();
-        let mut logger = AuditLogger::new(temp_dir.path()).unwrap();
+        let mut logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
 
         // Log different operations
         logger
@@ -300,7 +326,7 @@ mod tests {
     #[test]
     fn test_query_empty_log() {
         let temp_dir = TempDir::new().unwrap();
-        let logger = AuditLogger::new(temp_dir.path()).unwrap();
+        let logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
 
         let entries = logger.query(&AuditFilter::default()).unwrap();
         assert!(entries.is_empty());
@@ -309,7 +335,7 @@ mod tests {
     #[test]
     fn test_log_file_format() {
         let temp_dir = TempDir::new().unwrap();
-        let mut logger = AuditLogger::new(temp_dir.path()).unwrap();
+        let mut logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
 
         let entry = AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default());
         logger.log(entry).unwrap();
@@ -337,7 +363,7 @@ mod tests {
     #[test]
     fn test_log_preserves_entry_data() {
         let temp_dir = TempDir::new().unwrap();
-        let mut logger = AuditLogger::new(temp_dir.path()).unwrap();
+        let mut logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
 
         let mut params = AuditParameters::default();
         params.input.push(PathBuf::from("/test/file.txt"));
