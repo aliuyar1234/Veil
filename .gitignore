@@ -45,7 +45,6 @@ proptest-regressions/
 
 # Internal documentation and AI-assisted development artifacts
 .specify/
-specs/
 .claude/
 *.claude.*
 *claude-notes*

@@ -1,0 +1,72 @@
+openapi: 3.1.0
+info:
+  title: Veil API
+  description: PII Detection and Protection REST API
+  version: 2.0.0
+
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        200:
+          description: Service healthy
+
+  /api/v1/scan:
+    post:
+      summary: Scan content for PII
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Scan results
+        401:
+          description: Unauthorized
+
+  /api/v1/protect:
+    post:
+      summary: Redact PII from content
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Protected content
+
+  /api/v1/batch:
+    post:
+      summary: Batch process multiple files
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  maxItems: 100
+                fail_fast:
+                  type: boolean
+                parallel:
+                  type: boolean
+      responses:
+        200:
+          description: Batch results
+
+  /ws/stream:
+    get:
+      summary: WebSocket streaming endpoint
+      description: Real-time PII detection via WebSocket
+      responses:
+        101:
+          description: WebSocket upgrade
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
