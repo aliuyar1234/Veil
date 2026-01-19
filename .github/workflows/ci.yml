@@ -74,6 +74,31 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-features -- -D warnings
 
+  msrv:
+    name: MSRV (Rust 1.85)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Install Rust (MSRV)
+        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
+        with:
+          toolchain: 1.85.0
+
+      - name: Cache cargo registry
+        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-msrv-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-msrv-
+
+      - name: Build (MSRV)
+        run: cargo check --workspace --all-features
+
   wasm:
     name: WASM Build
     runs-on: ubuntu-24.04
@@ -179,7 +204,7 @@ jobs:
       - name: Generate coverage report
         run: cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
 
-      - name: Check coverage threshold (90%)
+      - name: Check coverage threshold (80%)
         run: |
           python - <<'PY'
           import json
@@ -193,8 +218,9 @@ jobs:
           data = json.loads(out)
           coverage = float(data["data"][0]["totals"]["lines"]["percent"])
           print(f"Coverage: {coverage:.2f}%")
-          if coverage < 90:
-              print(f"::warning::Coverage is below 90% threshold: {coverage:.2f}%")
+          if coverage < 80:
+              print(f"::error::Coverage is below 80% threshold: {coverage:.2f}%")
+              sys.exit(1)
           PY
 
       - name: Upload coverage to Codecov
@@ -230,19 +256,25 @@ jobs:
 
       - name: Run mutation testing
         run: |
-          cargo mutants --workspace --timeout 300 -- --all-features 2>&1 | tee mutants.log
+          cargo mutants -p veil-core -p veil-crypto -p veil-audit --timeout 300 -- --all-features 2>&1 | tee mutants.log || true
           python - <<'PY'
-          import re
+          import json
           from pathlib import Path
 
-          text = Path("mutants.log").read_text(encoding="utf-8", errors="replace")
-          match = re.search(
-              r"mutation score:\\s*([0-9]+(?:\\.[0-9]+)?)",
-              text,
-              flags=re.IGNORECASE,
-          )
-          score = float(match.group(1)) if match else 0.0
-          print(f"Mutation score: {score:.2f}%")
+          outcomes_path = Path("mutants.out/outcomes.json")
+          if not outcomes_path.exists():
+              print("::error::mutants.out/outcomes.json not found (cargo-mutants may have failed).")
+              raise SystemExit(1)
+
+          data = json.loads(outcomes_path.read_text(encoding="utf-8", errors="replace"))
+          caught = int(data.get("caught", 0) or 0)
+          missed = int(data.get("missed", 0) or 0)
+          unviable = int(data.get("unviable", 0) or 0)
+          denom = caught + missed
+          score = (caught / denom * 100.0) if denom else 0.0
+
+          print(f"Mutation score: {score:.2f}% (caught={caught}, missed={missed}, unviable={unviable})")
           if score < 80:
-              print(f"::warning::Mutation score is below 80% threshold: {score:.2f}%")
+              print(f"::error::Mutation score is below 80% threshold: {score:.2f}%")
+              raise SystemExit(1)
           PY

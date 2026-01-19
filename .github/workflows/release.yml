@@ -41,99 +41,59 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
 
-      # Publish in dependency order
-      - name: Publish veil-core
-        run: cargo publish -p veil-core --locked
+      - name: Publish crates (dependency order)
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Wait for crates.io
-        run: sleep 30
+          publish() {
+            local crate="$1"
+            local attempts=30
+            local delay=10
 
-      - name: Publish veil-types
-        run: cargo publish -p veil-types --locked
+            for i in $(seq 1 "$attempts"); do
+              echo "Publishing ${crate} (attempt ${i}/${attempts})"
+              set +e
+              out="$(cargo publish -p "${crate}" --locked 2>&1)"
+              status=$?
+              set -e
 
-      - name: Wait for crates.io
-        run: sleep 30
+              echo "${out}"
 
-      - name: Publish veil-fs
-        run: cargo publish -p veil-fs --locked
+              if [ "${status}" -eq 0 ]; then
+                return 0
+              fi
 
-      - name: Wait for crates.io
-        run: sleep 30
+              # Make the workflow re-runnable (e.g., if the job is retried).
+              if echo "${out}" | grep -qiE "already uploaded|already exists|409 Conflict"; then
+                echo "Crate ${crate} is already published; continuing."
+                return 0
+              fi
 
-      - name: Publish veil-parsers
-        run: cargo publish -p veil-parsers --locked
+              echo "Publish failed for ${crate}; retrying in ${delay}s..."
+              sleep "${delay}"
+            done
 
-      - name: Wait for crates.io
-        run: sleep 30
+            echo "Failed to publish ${crate} after ${attempts} attempts" >&2
+            return 1
+          }
 
-      - name: Publish veil-detect
-        run: cargo publish -p veil-detect --locked
-
-      - name: Wait for crates.io
-        run: sleep 30
-
-      - name: Publish veil-redact
-        run: cargo publish -p veil-redact --locked
-
-      - name: Wait for crates.io
-        run: sleep 30
-
-      - name: Publish veil-crypto
-        run: cargo publish -p veil-crypto --locked
-
-      - name: Wait for crates.io
-        run: sleep 30
-
-      - name: Publish veil-policy
-        run: cargo publish -p veil-policy --locked
-
-      - name: Wait for crates.io
-        run: sleep 30
-
-      - name: Publish veil-audit
-        run: cargo publish -p veil-audit --locked
-
-      - name: Wait for crates.io
-        run: sleep 30
-
-      - name: Publish veil-discovery
-        run: cargo publish -p veil-discovery --locked
-
-      - name: Wait for crates.io
-        run: sleep 30
-
-      - name: Publish veil-office
-        run: cargo publish -p veil-office --locked
-
-      - name: Wait for crates.io
-        run: sleep 30
-
-      - name: Publish veil-email
-        run: cargo publish -p veil-email --locked
-
-      - name: Wait for crates.io
-        run: sleep 30
-
-      - name: Publish veil-stream
-        run: cargo publish -p veil-stream --locked
-
-      - name: Wait for crates.io
-        run: sleep 30
-
-      - name: Publish veil-batch
-        run: cargo publish -p veil-batch --locked
-
-      - name: Wait for crates.io
-        run: sleep 30
-
-      - name: Publish veil-cli
-        run: cargo publish -p veil-cli --locked
-
-      - name: Wait for crates.io
-        run: sleep 30
-
-      - name: Publish veil-wasm
-        run: cargo publish -p veil-wasm --locked
+          publish veil-core
+          publish veil-types
+          publish veil-fs
+          publish veil-parsers
+          publish veil-detect
+          publish veil-redact
+          publish veil-crypto
+          publish veil-policy
+          publish veil-audit
+          publish veil-discovery
+          publish veil-office
+          publish veil-email
+          publish veil-stream
+          publish veil-batch
+          publish veil-cli
+          publish veil-wasm
 
   sbom:
     name: Generate SBOM

@@ -162,4 +162,4 @@ Note: `pdf-extract` brings in `pdf` as a transitive dependency.
 | forms.pdf | Form field extraction | Text fields, checkboxes, dropdowns |
 | columns.pdf | Reading order | 2-column layout |
 | scanned.pdf | Scanned detection | Image-only pages |
-| encrypted.pdf | Encryption handling | Password: "test" |
+| encrypted.pdf | Encryption handling | Password: "test" <!-- pragma: allowlist secret --> |

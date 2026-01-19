@@ -31,6 +31,11 @@ coverage/
 *.profraw
 *.profdata
 
+# Mutation testing
+mutants.out/
+mutants.*.out/
+mutants.*/
+
 # Property-based test regressions
 proptest-regressions/
 *.proptest-regressions

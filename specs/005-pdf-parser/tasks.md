@@ -153,7 +153,7 @@
 
 **Status**: Basic error mapping exists, no test fixtures created
 
-- [ ] T047 [P] Create encrypted.pdf test fixture (password: "test") in tests/fixtures/pdf/encrypted.pdf
+- [ ] T047 [P] Create encrypted.pdf test fixture (password: "test") <!-- pragma: allowlist secret --> in tests/fixtures/pdf/encrypted.pdf
 - [ ] T048 [P] Write test for encrypted PDF detection in crates/veil-parsers/src/pdf/tests.rs
 - [x] T049 [P] Write test for corrupted PDF handling in crates/veil-parsers/src/pdf/tests.rs
 - [x] T050 Implement encrypted PDF detection in crates/veil-parsers/src/pdf/document.rs

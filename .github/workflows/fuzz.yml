@@ -1,0 +1,50 @@
+name: Fuzz
+
+on:
+  schedule:
+    # Weekly (Sunday 03:00 UTC)
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  fuzz:
+    name: Fuzz (${{ matrix.target }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [email_parser, office_parser, pdf_parser, policy_yaml]
+    steps:
+      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Install Rust (nightly)
+        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
+        with:
+          toolchain: nightly
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+
+      - name: Cache cargo registry
+        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-fuzz-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-fuzz-
+
+      - name: Run fuzz target
+        run: |
+          cd fuzz
+          cargo fuzz run ${{ matrix.target }} -- -max_total_time=60
+

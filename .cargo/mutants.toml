@@ -1,0 +1,6 @@
+exclude_globs = [
+  # Best-effort OS-specific file permission hardening; tested indirectly via normal tests,
+  # but mutation testing yields many equivalent/unreliable mutants here.
+  "crates/veil-audit/src/fs_security.rs",
+]
+

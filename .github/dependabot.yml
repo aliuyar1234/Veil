@@ -50,16 +50,3 @@ updates:
       actions:
         patterns:
           - "*"
-
-  # npm (for WASM package if published)
-  - package-ecosystem: "npm"
-    directory: "/crates/veil-wasm/pkg"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "deps(npm)"
-    labels:
-      - "dependencies"
-      - "javascript"
