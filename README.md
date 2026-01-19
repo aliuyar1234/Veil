@@ -16,12 +16,12 @@ Local-first PII detection and redaction toolkit. Runs offline by default and kee
 ## Security and data handling
 
 - Data stays on the host; Veil does not initiate network connections at runtime.
-- Output and logs redact PII by default; `scan --include-values` requires confirmation.
-- Sensitive strings are zeroized on drop and redacted in Debug, Display, and Serialize.
-- Audit logs are chained for tamper detection; on Unix they are created with 0600 perms.
-- Plaintext key and token storage is disabled by default. Set `VEIL_ALLOW_PLAINTEXT_STORAGE=1`
-  to use `LocalKeyProvider` or `FileVault` for development.
-- Encrypted audit logs require the `encryption` feature.
+- Output and logs redact PII by default; `scan --include-values` requires confirmation. 
+- Sensitive strings are zeroized on drop and redacted in Debug, Display, and Serialize. 
+- Audit logs are chained for tamper detection; on Unix they are created with 0600 perms and on Windows the logger applies a restrictive DACL (best-effort). 
+- Plaintext key and token storage is disabled by default. Set `VEIL_ALLOW_PLAINTEXT_STORAGE=1` 
+  to use `LocalKeyProvider` or `FileVault` for development. 
+- Encrypted audit logs require the `encryption` feature. 
 
 ## Quick start (CLI)
 
@@ -91,13 +91,15 @@ Document -> Parse -> Detect -> Protect -> Output
 3. Protect: mask, label, replace, tokenize, or encrypt based on policy.
 4. Output: return a safe document and optional audit log.
 
-## Configuration and safety switches
-
-- `scan --include-values` exposes matched values and prompts for confirmation; add `-y` to skip the prompt.
-- `--policy` selects a policy file; `policy init` generates a starter policy.
-- `batch --max-size` caps file size (MB); `--jobs` controls parallelism.
-- `batch --zip` and `--zip-password` enable archive processing.
-- Plaintext key and token storage is disabled by default; set `VEIL_ALLOW_PLAINTEXT_STORAGE=1` for dev.
+## Configuration and safety switches 
+ 
+- `scan --include-values` exposes matched values and prompts for confirmation; add `-y` to skip the prompt. 
+- `scan --detect email,phone` limits detection to the specified detector(s); unknown detector names are rejected. 
+- `scan --fail-on-findings` exits with code 2 if any findings are detected (useful for CI pipelines). 
+- `--policy` selects a policy file; `policy init` generates a starter policy. 
+- `batch --max-size` caps file size (MB); `--jobs` controls parallelism. 
+- `batch --zip` and `--zip-password` enable archive processing. 
+- Plaintext key and token storage is disabled by default; set `VEIL_ALLOW_PLAINTEXT_STORAGE=1` for dev. 
 
 ## Performance and limits
 
@@ -144,15 +146,15 @@ cargo build --workspace
 # Run tests
 cargo test --workspace
 
-# Run with all features
-cargo test --workspace --all-features
-
-# Check code quality
-cargo clippy --workspace -- -D warnings
-
-# Format code
-cargo fmt --all
-```
+# Run with all features 
+cargo test --workspace --all-features 
+ 
+# Check code quality 
+cargo clippy --workspace --all-features -- -D warnings 
+ 
+# Format code 
+cargo fmt --all 
+``` 
 
 ### Benchmarks
 
