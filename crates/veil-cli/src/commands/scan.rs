@@ -1,5 +1,6 @@
 //! Scan command implementation.
 
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{Cursor, IsTerminal, Read};
 use std::path::Path;
@@ -25,13 +26,57 @@ const OFFICE_EXTENSIONS: &[&str] = &["docx", "xlsx", "pptx"];
 const EMAIL_EXTENSIONS: &[&str] = &["eml", "msg"];
 const PDF_EXTENSIONS: &[&str] = &["pdf"];
 
+fn should_print_human_stderr(quiet: bool, json: bool) -> bool {
+    !quiet && !json
+}
+
+fn apply_detect_filter(
+    registry: &mut DetectorRegistry,
+    detect: &Option<Vec<String>>,
+) -> Result<()> {
+    let Some(selected) = detect else {
+        return Ok(());
+    };
+
+    let selected: HashSet<String> = selected.iter().map(|s| s.to_ascii_lowercase()).collect();
+    let detector_names: Vec<String> = registry
+        .detector_names()
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    let available: HashSet<String> = detector_names
+        .iter()
+        .map(|s| s.to_ascii_lowercase())
+        .collect();
+
+    let mut unknown: Vec<String> = selected.difference(&available).cloned().collect();
+    unknown.sort();
+    if !unknown.is_empty() {
+        let mut available: Vec<String> = available.into_iter().collect();
+        available.sort();
+        return Err(miette::miette!(
+            "Unknown detector(s): {}. Available: {}",
+            unknown.join(", "),
+            available.join(", ")
+        ));
+    }
+
+    for name in detector_names {
+        if !selected.contains(&name.to_ascii_lowercase()) {
+            registry.disable(&name);
+        }
+    }
+
+    Ok(())
+}
+
 /// Run the scan command.
 pub fn run(args: ScanArgs, quiet: bool, json: bool) -> Result<()> {
     // Handle --include-values confirmation
     let include_values = if args.include_values {
         if args.yes {
             // --yes flag bypasses confirmation
-            if !quiet && !json {
+            if should_print_human_stderr(quiet, json) {
                 eprintln!("Warning: Including PII values in output (--yes flag used)");
             }
             true
@@ -66,7 +111,8 @@ pub fn run(args: ScanArgs, quiet: bool, json: bool) -> Result<()> {
         None => default_policy(),
     };
 
-    let registry = DetectorRegistry::default();
+    let mut registry = DetectorRegistry::default();
+    apply_detect_filter(&mut registry, &args.detect)?;
     let mut total_findings = 0;
     let mut all_results = Vec::new();
 
@@ -82,7 +128,7 @@ pub fn run(args: ScanArgs, quiet: bool, json: bool) -> Result<()> {
                     include_values,
                     &mut all_results,
                 )?;
-            } else if !quiet && !json {
+            } else if should_print_human_stderr(quiet, json) {
                 eprintln!(
                     "Skipping directory: {} (use -r for recursive)",
                     path.display()
@@ -181,7 +227,7 @@ fn scan_file(
     let finding_outputs: Vec<FindingOutput> = filtered
         .iter()
         .map(|f| FindingOutput {
-            category: f.category.to_string(),
+            category: f.category.as_str().to_string(),
             // Only include PII text if explicitly requested
             // Use .as_str() to get the actual value (Display is intentionally redacted)
             text: if include_values {
@@ -260,13 +306,17 @@ fn parse_email_file(path: &Path) -> Result<(ParseResult, String)> {
     let result = parse_email_to_result(&data, &options)
         .map_err(|e| miette::miette!("Email parse error: {}", e))?;
 
-    let format = match result.metadata.format {
+    let format = email_format_label(result.metadata.format);
+
+    Ok((result, format.to_string()))
+}
+
+fn email_format_label(format: FileFormat) -> &'static str {
+    match format {
         FileFormat::Eml => "eml",
         FileFormat::Msg => "msg",
         _ => "email",
-    };
-
-    Ok((result, format.to_string()))
+    }
 }
 
 fn parse_pdf_file(path: &Path) -> Result<(ParseResult, String)> {
@@ -293,7 +343,7 @@ fn scan_directory(
         let entry = match entry {
             Ok(entry) => entry,
             Err(e) => {
-                if !quiet && !json {
+                if should_print_human_stderr(quiet, json) {
                     eprintln!("Warning: Failed to access path: {}", e);
                 }
                 continue;
@@ -318,7 +368,7 @@ fn scan_directory(
             match scan_file(path, registry, policy, quiet, include_values) {
                 Ok(result) => results.push(result),
                 Err(e) => {
-                    if !quiet && !json {
+                    if should_print_human_stderr(quiet, json) {
                         eprintln!("Error scanning {}: {}", path.display(), e);
                     }
                 }
@@ -335,6 +385,24 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
+    fn should_print_human_stderr_requires_nonquiet_nonjson() {
+        assert!(should_print_human_stderr(false, false));
+        assert!(!should_print_human_stderr(true, false));
+        assert!(!should_print_human_stderr(false, true));
+        assert!(!should_print_human_stderr(true, true));
+    }
+
+    #[test]
+    fn enforce_max_input_size_allows_exact_max_size() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("exact_max.bin");
+        let file = std::fs::File::create(&file_path).unwrap();
+        file.set_len(DEFAULT_MAX_FILE_SIZE as u64).unwrap();
+
+        assert!(enforce_max_input_size(&file_path).is_ok());
+    }
+
+    #[test]
     fn enforce_max_input_size_rejects_large_files() {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("big.bin");
@@ -343,5 +411,59 @@ mod tests {
         file.set_len(DEFAULT_MAX_FILE_SIZE as u64 + 1).unwrap();
 
         assert!(enforce_max_input_size(&file_path).is_err());
+    }
+
+    #[test]
+    fn parse_office_file_routes_to_correct_parser_by_extension() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let docx = temp_dir.path().join("file.docx");
+        std::fs::write(&docx, []).unwrap();
+        let err = parse_office_file(&docx).unwrap_err();
+        assert!(format!("{err}").contains("DOCX parse error"));
+
+        let xlsx = temp_dir.path().join("file.xlsx");
+        std::fs::write(&xlsx, []).unwrap();
+        let err = parse_office_file(&xlsx).unwrap_err();
+        assert!(format!("{err}").contains("XLSX parse error"));
+
+        let pptx = temp_dir.path().join("file.pptx");
+        std::fs::write(&pptx, []).unwrap();
+        let err = parse_office_file(&pptx).unwrap_err();
+        assert!(format!("{err}").contains("PPTX parse error"));
+    }
+
+    #[test]
+    fn email_format_label_is_stable() {
+        assert_eq!(email_format_label(FileFormat::Eml), "eml");
+        assert_eq!(email_format_label(FileFormat::Msg), "msg");
+        assert_eq!(email_format_label(FileFormat::Pdf), "email");
+    }
+
+    #[test]
+    fn apply_detect_filter_rejects_unknown_detectors() {
+        let mut registry = DetectorRegistry::default();
+        let detect = Some(vec!["definitely-not-a-detector".to_string()]);
+        assert!(apply_detect_filter(&mut registry, &detect).is_err());
+    }
+
+    #[test]
+    fn apply_detect_filter_disables_unselected_detectors() {
+        let mut registry = DetectorRegistry::default();
+        let all: Vec<String> = registry
+            .detector_names()
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert!(all.iter().any(|s| s == "email"));
+
+        apply_detect_filter(&mut registry, &Some(vec!["email".to_string()])).unwrap();
+        assert!(registry.is_enabled("email"));
+
+        let other = all
+            .iter()
+            .find(|name| *name != "email")
+            .expect("expected at least one detector besides email");
+        assert!(!registry.is_enabled(other));
     }
 }

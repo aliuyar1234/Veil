@@ -3,6 +3,7 @@
 use assert_cmd::cargo::cargo_bin_cmd;
 use assert_cmd::Command;
 use predicates::prelude::*;
+use serde_json::Value;
 use std::fs;
 use tempfile::TempDir;
 
@@ -116,6 +117,34 @@ fn test_scan_nonexistent_file() {
 }
 
 #[test]
+fn test_scan_invalid_office_file_prints_error_unless_quiet() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("bad.docx");
+    fs::write(&file_path, []).unwrap();
+
+    veil_cmd()
+        .args(["scan", file_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0 findings"))
+        .stderr(predicate::str::contains("Error scanning"));
+}
+
+#[test]
+fn test_scan_invalid_office_file_quiet_mode_suppresses_error_output() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("bad.docx");
+    fs::write(&file_path, []).unwrap();
+
+    veil_cmd()
+        .args(["--quiet", "scan", file_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::is_empty());
+}
+
+#[test]
 fn test_scan_csv_file() {
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("data.csv");
@@ -166,7 +195,166 @@ fn test_scan_quiet_mode() {
     veil_cmd()
         .args(["--quiet", "scan", file_path.to_str().unwrap()])
         .assert()
+        .success()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::is_empty());
+}
+
+#[test]
+fn test_scan_fail_on_findings_exits_with_code_2() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    fs::write(&file_path, "Contact: test@example.com").unwrap();
+
+    veil_cmd()
+        .args(["scan", "--fail-on-findings", file_path.to_str().unwrap()])
+        .assert()
+        .failure()
+        .code(2);
+}
+
+#[test]
+fn test_scan_fail_on_findings_does_not_trigger_on_zero_findings() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    fs::write(&file_path, "Hello world, no PII here.").unwrap();
+
+    veil_cmd()
+        .args(["scan", "--fail-on-findings", file_path.to_str().unwrap()])
+        .assert()
         .success();
+}
+
+#[test]
+fn test_scan_include_values_requires_yes_in_noninteractive_mode() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    fs::write(&file_path, "Contact: test@example.com").unwrap();
+
+    veil_cmd()
+        .args(["scan", "--include-values", file_path.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("requires --yes"));
+}
+
+#[test]
+fn test_scan_include_values_with_yes_includes_values_in_json() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    fs::write(&file_path, "Contact: test@example.com").unwrap();
+
+    let assert = veil_cmd()
+        .args([
+            "--quiet",
+            "--json",
+            "scan",
+            "--include-values",
+            "--yes",
+            file_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let json: Value = serde_json::from_str(&stdout).unwrap();
+    let results = json.as_array().expect("expected JSON array");
+    assert_eq!(results.len(), 1);
+
+    let findings = results[0]["findings"].as_array().expect("findings array");
+    assert!(!findings.is_empty());
+    assert!(findings.iter().any(|f| {
+        f.get("text")
+            .and_then(|t| t.as_str())
+            .is_some_and(|t| t.contains("test@example.com"))
+    }));
+}
+
+#[test]
+fn test_scan_recursive_directory_scans_supported_files_only() {
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+
+    let supported = root.join("supported.txt");
+    fs::write(&supported, "Contact: test@example.com").unwrap();
+
+    let supported_eml = root.join("supported.eml");
+    fs::write(
+        &supported_eml,
+        "From: a@example.com\nTo: b@example.com\nSubject: Test\n\nBody: test@example.com\n",
+    )
+    .unwrap();
+
+    let unsupported = root.join("unsupported.bin");
+    fs::write(&unsupported, "Contact: test@example.com").unwrap();
+
+    let assert = veil_cmd()
+        .args(["--json", "scan", "-r", root.to_str().unwrap()])
+        .assert()
+        .success();
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let json: Value = serde_json::from_str(&stdout).unwrap();
+    let results = json.as_array().expect("expected JSON array");
+    assert_eq!(results.len(), 2);
+    assert!(results.iter().any(|r| r["file"]
+        .as_str()
+        .is_some_and(|f| f.ends_with("supported.txt"))));
+    assert!(results.iter().any(|r| r["file"]
+        .as_str()
+        .is_some_and(|f| f.ends_with("supported.eml"))));
+    assert!(!results.iter().any(|r| r["file"]
+        .as_str()
+        .is_some_and(|f| f.ends_with("unsupported.bin"))));
+}
+
+#[test]
+fn test_scan_detect_filter_limits_categories() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    fs::write(&file_path, "Email: test@example.com Phone: 555-123-4567").unwrap();
+
+    let assert = veil_cmd()
+        .args([
+            "--json",
+            "scan",
+            "--detect",
+            "email",
+            file_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let json: Value = serde_json::from_str(&stdout).unwrap();
+    let results = json.as_array().expect("expected JSON array");
+    assert_eq!(results.len(), 1);
+
+    let findings = results[0]["findings"].as_array().expect("findings array");
+    assert!(findings.iter().all(|f| {
+        f.get("category")
+            .and_then(|c| c.as_str())
+            .is_some_and(|c| c == "email")
+    }));
+}
+
+#[test]
+fn test_scan_detect_filter_unknown_detector_is_error() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    fs::write(&file_path, "Email: test@example.com").unwrap();
+
+    veil_cmd()
+        .args([
+            "scan",
+            "--detect",
+            "definitely-not-a-detector",
+            file_path.to_str().unwrap(),
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Unknown detector"));
 }
 
 // ============== Protect Command Tests ==============
