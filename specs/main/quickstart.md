@@ -4,13 +4,13 @@
 
 ## Prerequisites
 
-- Rust 1.75+ (stable)
+- Rust 1.85+ (stable)
 - Git
 - Cargo (comes with Rust)
 
 ```bash
 # Check Rust version
-rustc --version  # Should be 1.75.0 or higher
+rustc --version  # Should be 1.85.0 or higher
 
 # Update if needed
 rustup update stable
@@ -20,7 +20,7 @@ rustup update stable
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/veil.git
+git clone https://github.com/aliuyar1234/Veil.git
 cd veil
 
 # Verify workspace structure
@@ -191,7 +191,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/your-org/veil"
+repository = "https://github.com/aliuyar1234/Veil"
 
 [workspace.dependencies]
 # Serialization

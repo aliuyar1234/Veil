@@ -1,7 +1,7 @@
 ﻿# Veil
 
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 
 Local-first PII detection and redaction toolkit. Runs offline by default and keeps data on your machine.
 
@@ -132,7 +132,7 @@ Veil/
 
 ### Requirements
 
-- Rust 1.75 or newer
+- Rust 1.85 or newer
 - Cargo (comes with Rust)
 
 ### Build and test

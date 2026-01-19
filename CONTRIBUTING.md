@@ -21,6 +21,7 @@ This project adheres to a code of conduct. By participating, you are expected to
 ### Prerequisites
 
 - Rust 1.75 or later (stable)
+- Rust 1.85 or later (stable)
 - Git
 - (Optional) `just` command runner
 - (Optional) `pre-commit` for git hooks
@@ -35,7 +36,7 @@ This project adheres to a code of conduct. By participating, you are expected to
    ```
 3. Add the upstream remote:
    ```bash
-   git remote add upstream https://github.com/your-org/veil.git
+   git remote add upstream https://github.com/aliuyar1234/Veil.git
    ```
 
 ## Development Setup

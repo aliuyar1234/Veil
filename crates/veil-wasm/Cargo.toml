@@ -3,6 +3,7 @@ name = "veil-wasm"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "WebAssembly bindings for Veil PII detection and protection"
 
 [lib]
@@ -41,4 +42,4 @@ wasm-bindgen-test = "0.3.40"
 # to avoid "profiles for non root package will be ignored" warning
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-Oz"]
+wasm-opt = ["-Oz", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
