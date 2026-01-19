@@ -5,6 +5,7 @@ mod fixture_generator;
 use std::fs::{self, File};
 use std::io::Cursor;
 use std::path::Path;
+use std::sync::Once;
 
 use veil_office::{detect_office_type, parse_docx, parse_pptx, parse_xlsx, OfficeType};
 
@@ -13,84 +14,88 @@ fn fixtures_path() -> &'static Path {
 }
 
 fn setup_fixtures() {
-    fixture_generator::ensure_fixtures_dir().expect("Failed to create fixtures dir");
+    static INIT: Once = Once::new();
 
-    // DOCX fixtures
-    let docx_path = fixtures_path().join("docx");
+    INIT.call_once(|| {
+        fixture_generator::ensure_fixtures_dir().expect("Failed to create fixtures dir");
 
-    // Simple DOCX
-    fixture_generator::generate_simple_docx(
-        &docx_path.join("simple.docx"),
-        "This is a simple test document with PII. Contact: john.doe@example.com Phone: 555-123-4567",
-    )
-    .expect("Failed to generate simple.docx");
+        // DOCX fixtures
+        let docx_path = fixtures_path().join("docx");
 
-    // Multi-paragraph DOCX
-    fixture_generator::generate_multi_paragraph_docx(
-        &docx_path.join("multi_paragraph.docx"),
-        &[
-            "First paragraph with email: alice@example.com",
-            "Second paragraph with phone: (555) 987-6543",
-            "Third paragraph with SSN: 123-45-6789",
-            "Fourth paragraph with credit card: 4111-1111-1111-1111",
-        ],
-    )
-    .expect("Failed to generate multi_paragraph.docx");
+        // Simple DOCX
+        fixture_generator::generate_simple_docx(
+            &docx_path.join("simple.docx"),
+            "This is a simple test document with PII. Contact: john.doe@example.com Phone: 555-123-4567",
+        )
+        .expect("Failed to generate simple.docx");
 
-    // DOCX with special characters
-    fixture_generator::generate_simple_docx(
-        &docx_path.join("special_chars.docx"),
-        "Special characters: <test> \"quoted\" 'apostrophe' & ampersand",
-    )
-    .expect("Failed to generate special_chars.docx");
+        // Multi-paragraph DOCX
+        fixture_generator::generate_multi_paragraph_docx(
+            &docx_path.join("multi_paragraph.docx"),
+            &[
+                "First paragraph with email: alice@example.com",
+                "Second paragraph with phone: (555) 987-6543",
+                "Third paragraph with SSN: 123-45-6789",
+                "Fourth paragraph with credit card: 4111-1111-1111-1111",
+            ],
+        )
+        .expect("Failed to generate multi_paragraph.docx");
 
-    // XLSX fixtures
-    let xlsx_path = fixtures_path().join("xlsx");
+        // DOCX with special characters
+        fixture_generator::generate_simple_docx(
+            &docx_path.join("special_chars.docx"),
+            "Special characters: <test> \"quoted\" 'apostrophe' & ampersand",
+        )
+        .expect("Failed to generate special_chars.docx");
 
-    // Simple XLSX
-    fixture_generator::generate_simple_xlsx(
-        &xlsx_path.join("simple.xlsx"),
-        &[
-            vec!["Name", "Email", "Phone"],
-            vec!["John Doe", "john@example.com", "555-111-2222"],
-            vec!["Jane Smith", "jane@example.com", "555-333-4444"],
-        ],
-    )
-    .expect("Failed to generate simple.xlsx");
+        // XLSX fixtures
+        let xlsx_path = fixtures_path().join("xlsx");
 
-    // XLSX with PII
-    fixture_generator::generate_simple_xlsx(
-        &xlsx_path.join("pii_data.xlsx"),
-        &[
-            vec!["ID", "Name", "SSN", "Email"],
-            vec!["1", "Alice Brown", "123-45-6789", "alice@example.com"],
-            vec!["2", "Bob Wilson", "987-65-4321", "bob@example.org"],
-            vec!["3", "Carol Davis", "456-78-9012", "carol@example.net"],
-        ],
-    )
-    .expect("Failed to generate pii_data.xlsx");
+        // Simple XLSX
+        fixture_generator::generate_simple_xlsx(
+            &xlsx_path.join("simple.xlsx"),
+            &[
+                vec!["Name", "Email", "Phone"],
+                vec!["John Doe", "john@example.com", "555-111-2222"],
+                vec!["Jane Smith", "jane@example.com", "555-333-4444"],
+            ],
+        )
+        .expect("Failed to generate simple.xlsx");
 
-    // PPTX fixtures
-    let pptx_path = fixtures_path().join("pptx");
+        // XLSX with PII
+        fixture_generator::generate_simple_xlsx(
+            &xlsx_path.join("pii_data.xlsx"),
+            &[
+                vec!["ID", "Name", "SSN", "Email"],
+                vec!["1", "Alice Brown", "123-45-6789", "alice@example.com"],
+                vec!["2", "Bob Wilson", "987-65-4321", "bob@example.org"],
+                vec!["3", "Carol Davis", "456-78-9012", "carol@example.net"],
+            ],
+        )
+        .expect("Failed to generate pii_data.xlsx");
 
-    // Simple PPTX
-    fixture_generator::generate_simple_pptx(
-        &pptx_path.join("simple.pptx"),
-        &["Welcome to the Presentation - Contact: presenter@example.com"],
-    )
-    .expect("Failed to generate simple.pptx");
+        // PPTX fixtures
+        let pptx_path = fixtures_path().join("pptx");
 
-    // Multi-slide PPTX
-    fixture_generator::generate_simple_pptx(
-        &pptx_path.join("multi_slide.pptx"),
-        &[
-            "Slide 1: Introduction - Email: intro@example.com",
-            "Slide 2: Main Content - Phone: 555-CALL-NOW",
-            "Slide 3: Contact Info - SSN: 111-22-3333",
-            "Slide 4: Conclusion - Thanks!",
-        ],
-    )
-    .expect("Failed to generate multi_slide.pptx");
+        // Simple PPTX
+        fixture_generator::generate_simple_pptx(
+            &pptx_path.join("simple.pptx"),
+            &["Welcome to the Presentation - Contact: presenter@example.com"],
+        )
+        .expect("Failed to generate simple.pptx");
+
+        // Multi-slide PPTX
+        fixture_generator::generate_simple_pptx(
+            &pptx_path.join("multi_slide.pptx"),
+            &[
+                "Slide 1: Introduction - Email: intro@example.com",
+                "Slide 2: Main Content - Phone: 555-CALL-NOW",
+                "Slide 3: Contact Info - SSN: 111-22-3333",
+                "Slide 4: Conclusion - Thanks!",
+            ],
+        )
+        .expect("Failed to generate multi_slide.pptx");
+    });
 }
 
 // ==================== DOCX Tests ====================
