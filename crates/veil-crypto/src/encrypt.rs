@@ -5,7 +5,7 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use rand::RngCore;
-use zeroize::Zeroize;
+use zeroize::Zeroizing;
 
 use crate::error::CryptoError;
 use crate::types::{CryptoMetadata, CryptoResult, OutputFormat, ProtectionMode};
@@ -20,7 +20,7 @@ const AES_GCM_NONCE_SIZE: usize = 12;
 #[derive(Clone)]
 pub struct EncryptionConfig {
     /// Encryption key (must be 32 bytes for AES-256).
-    key: Vec<u8>,
+    key: Zeroizing<Vec<u8>>,
     /// Output encoding format.
     pub output_format: OutputFormat,
 }
@@ -32,25 +32,22 @@ impl EncryptionConfig {
     /// * `key` - 32-byte encryption key for AES-256
     pub fn new(key: Vec<u8>) -> Self {
         Self {
-            key,
+            key: Zeroizing::new(key),
             output_format: OutputFormat::Base64,
         }
     }
 
     /// Create a new encryption config with custom output format.
     pub fn with_format(key: Vec<u8>, output_format: OutputFormat) -> Self {
-        Self { key, output_format }
+        Self {
+            key: Zeroizing::new(key),
+            output_format,
+        }
     }
 
     /// Get the key reference.
     pub fn key(&self) -> &[u8] {
-        &self.key
-    }
-}
-
-impl Drop for EncryptionConfig {
-    fn drop(&mut self) {
-        self.key.zeroize();
+        self.key.as_slice()
     }
 }
 
@@ -74,15 +71,15 @@ impl Drop for EncryptionConfig {
 /// ```
 pub fn encrypt(plaintext: &[u8], config: &EncryptionConfig) -> Result<CryptoResult, CryptoError> {
     // Validate key length
-    if config.key.len() != AES_256_KEY_SIZE {
+    if config.key().len() != AES_256_KEY_SIZE {
         return Err(CryptoError::InvalidKeyLength {
             expected: AES_256_KEY_SIZE,
-            actual: config.key.len(),
+            actual: config.key().len(),
         });
     }
 
     // Create cipher
-    let cipher = Aes256Gcm::new_from_slice(&config.key)
+    let cipher = Aes256Gcm::new_from_slice(config.key())
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
     // Generate random nonce
@@ -138,10 +135,10 @@ pub fn encrypt(plaintext: &[u8], config: &EncryptionConfig) -> Result<CryptoResu
 /// ```
 pub fn decrypt(result: &CryptoResult, config: &EncryptionConfig) -> Result<Vec<u8>, CryptoError> {
     // Validate key length
-    if config.key.len() != AES_256_KEY_SIZE {
+    if config.key().len() != AES_256_KEY_SIZE {
         return Err(CryptoError::InvalidKeyLength {
             expected: AES_256_KEY_SIZE,
-            actual: config.key.len(),
+            actual: config.key().len(),
         });
     }
 
@@ -162,7 +159,7 @@ pub fn decrypt(result: &CryptoResult, config: &EncryptionConfig) -> Result<Vec<u
     let nonce = Nonce::from_slice(nonce_bytes);
 
     // Create cipher
-    let cipher = Aes256Gcm::new_from_slice(&config.key)
+    let cipher = Aes256Gcm::new_from_slice(config.key())
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
     // Decrypt
@@ -308,5 +305,28 @@ mod tests {
         let decrypted = decrypt(&encrypted, &config).unwrap();
 
         assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn test_decrypt_raw_round_trip() {
+        let config = EncryptionConfig::new(test_key());
+        let plaintext = b"decrypt_raw";
+
+        let encrypted = encrypt(plaintext, &config).unwrap();
+        let decrypted = decrypt_raw(&encrypted.value, &config).unwrap();
+
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn test_decrypt_nonce_only_ciphertext_returns_decryption_failed() {
+        let config = EncryptionConfig::new(test_key());
+
+        // Decode yields exactly the nonce size; AES-GCM requires a tag, so decryption should fail.
+        let encoded = config.output_format.encode(&[0u8; AES_GCM_NONCE_SIZE]);
+        let result = CryptoResult::new(encoded, ProtectionMode::Encrypt);
+
+        let err = decrypt(&result, &config).unwrap_err();
+        assert!(matches!(err, CryptoError::DecryptionFailed));
     }
 }

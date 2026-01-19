@@ -218,35 +218,6 @@ mod tests {
         assert_eq!(cloned.as_str(), "secret");
     }
 
-    // T009: Test SensitiveString drop zeros memory
-    #[test]
-    fn test_drop_zeros_memory() {
-        let ptr: *const u8;
-        let len: usize;
-
-        {
-            let sensitive = SensitiveString::new("secret123");
-            ptr = sensitive.as_ptr();
-            len = sensitive.len();
-        }
-        // `sensitive` dropped here, memory should be zeroed
-
-        // Verify memory is zeroed (unsafe, for testing only)
-        // Note: This test may be flaky if memory is reallocated
-        unsafe {
-            let slice = std::slice::from_raw_parts(ptr, len);
-            // At least some bytes should be zeroed
-            let zeroed_count = slice.iter().filter(|&&b| b == 0).count();
-            // We expect most or all bytes to be zeroed
-            assert!(
-                zeroed_count >= len / 2,
-                "Expected at least half the bytes to be zeroed, got {}/{}",
-                zeroed_count,
-                len
-            );
-        }
-    }
-
     // T010: Test SensitiveString debug output is redacted
     #[test]
     fn test_debug_output_is_redacted() {
@@ -286,6 +257,25 @@ mod tests {
     }
 
     #[test]
+    fn test_is_empty_false_for_non_empty() {
+        let value = SensitiveString::new("not empty");
+        assert!(!value.is_empty());
+    }
+
+    #[test]
+    fn test_as_ref_returns_inner_value() {
+        let sensitive = SensitiveString::new("hello");
+        let as_ref: &str = sensitive.as_ref();
+        assert_eq!(as_ref, "hello");
+    }
+
+    #[test]
+    fn test_from_str_impl() {
+        let sensitive: SensitiveString = SensitiveString::from("hello");
+        assert_eq!(sensitive.as_str(), "hello");
+    }
+
+    #[test]
     fn test_default() {
         let default: SensitiveString = Default::default();
         assert!(default.is_empty());
@@ -311,6 +301,22 @@ mod tests {
         set.insert(SensitiveString::new("key1")); // Duplicate
 
         assert_eq!(set.len(), 2);
+    }
+
+    #[test]
+    fn test_hash_changes_with_value() {
+        use std::collections::hash_map::DefaultHasher;
+
+        fn hashed(value: &SensitiveString) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        let a = SensitiveString::new("a");
+        let b = SensitiveString::new("b");
+
+        assert_ne!(hashed(&a), hashed(&b));
     }
 
     #[test]

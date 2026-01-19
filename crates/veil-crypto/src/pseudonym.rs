@@ -426,11 +426,36 @@ mod tests {
     }
 
     #[test]
+    fn test_input_derived_seed_varies_by_input() {
+        let config = PseudonymConfig::new()
+            .with_type(PseudonymDataType::Name)
+            .consistent();
+
+        let a = pseudonymize("input-a", &config).unwrap();
+        let b = pseudonymize("input-b", &config).unwrap();
+
+        assert_ne!(a.value, b.value);
+    }
+
+    #[test]
     fn test_metadata_contains_data_type() {
         let config = PseudonymConfig::new().with_type(PseudonymDataType::Email);
         let result = pseudonymize("test", &config).unwrap();
 
         assert_eq!(result.metadata.data_type, Some("email".to_string()));
+    }
+
+    #[test]
+    fn test_cached_consistent_mode_preserves_metadata_data_type() {
+        let config = PseudonymConfig::new()
+            .with_type(PseudonymDataType::Email)
+            .consistent_with_seed(123);
+
+        let first = pseudonymize("cache-me", &config).unwrap();
+        let second = pseudonymize("cache-me", &config).unwrap();
+
+        assert_eq!(first.value, second.value);
+        assert_eq!(second.metadata.data_type, Some("email".to_string()));
     }
 
     #[test]
@@ -464,5 +489,48 @@ mod tests {
 
         let result = pseudonymize("Berlin", &config).unwrap();
         assert!(!result.value.is_empty());
+    }
+
+    #[test]
+    fn test_german_postal_code_is_five_digits() {
+        let config = PseudonymConfig::new()
+            .with_locale("de_DE")
+            .with_type(PseudonymDataType::PostalCode)
+            .consistent_with_seed(42);
+
+        let result = pseudonymize("80331", &config).unwrap();
+        assert_eq!(result.value.len(), 5);
+        assert!(result.value.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn test_german_phone_number_format() {
+        let config = PseudonymConfig::new()
+            .with_locale("de_DE")
+            .with_type(PseudonymDataType::Phone)
+            .consistent_with_seed(42);
+
+        let result = pseudonymize("phone", &config).unwrap();
+        let rest = result.value.strip_prefix("+49 ").unwrap();
+        let parts: Vec<_> = rest.split(' ').collect();
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0].len(), 3);
+        assert_eq!(parts[1].len(), 7);
+        assert!(parts[0].chars().all(|c| c.is_ascii_digit()));
+        assert!(parts[1].chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn test_generic_pseudonym_is_upper_alphanumeric_and_reasonable_length() {
+        let config = PseudonymConfig::new()
+            .with_type(PseudonymDataType::Generic)
+            .consistent_with_seed(42);
+
+        let result = pseudonymize("generic", &config).unwrap();
+        assert!((8..16).contains(&result.value.len()));
+        assert!(result
+            .value
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()));
     }
 }

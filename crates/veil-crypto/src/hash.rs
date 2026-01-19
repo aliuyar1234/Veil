@@ -286,6 +286,8 @@ mod tests {
         let hmac1 = hash(data, &config).unwrap();
         let hmac2 = hash(data, &config).unwrap();
 
+        assert_eq!(hmac1.value.len(), 64);
+        assert!(hmac1.value.chars().all(|c| c.is_ascii_hexdigit()));
         assert_eq!(hmac1.value, hmac2.value);
     }
 
@@ -326,6 +328,26 @@ mod tests {
     }
 
     #[test]
+    fn test_verify_hash_succeeds_with_random_salt_config() {
+        // When no salt is provided, `hash` generates a random salt and stores it in metadata.
+        // `verify_hash` must use metadata's salt rather than `config.salt`.
+        let config = HashConfig::sha256();
+        let data = b"random-salt-verify";
+
+        let result = hash(data, &config).unwrap();
+        assert!(result.metadata.salt.is_some());
+
+        let verified = verify_hash(data, &result, &config).unwrap();
+        assert!(verified);
+    }
+
+    #[test]
+    fn test_generate_salt_size() {
+        let salt = generate_salt(24);
+        assert_eq!(salt.len(), 24);
+    }
+
+    #[test]
     fn test_random_salt_when_none_provided() {
         let config = HashConfig::sha256();
         let data = b"random-salt-test";
@@ -355,6 +377,8 @@ mod tests {
             .with_format(OutputFormat::Base64);
         let result = hash(b"test", &config).unwrap();
 
+        // SHA-256 output is 32 bytes; Base64 with padding should be 44 characters.
+        assert_eq!(result.value.len(), 44);
         // Base64 characters
         assert!(result
             .value

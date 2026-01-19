@@ -105,8 +105,9 @@ fn hex_encode(bytes: &[u8]) -> String {
 }
 
 /// Decode hex string to bytes.
+#[allow(clippy::manual_is_multiple_of)] // keep MSRV compatibility (is_multiple_of stabilized after 1.85)
 fn hex_decode(s: &str) -> Result<Vec<u8>, String> {
-    if !s.len().is_multiple_of(2) {
+    if s.len() % 2 != 0 {
         return Err("Invalid hex: odd length".to_string());
     }
 

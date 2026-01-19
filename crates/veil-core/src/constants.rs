@@ -36,5 +36,7 @@ mod tests {
         assert_eq!(DEFAULT_MAX_FILE_SIZE, 104_857_600);
         assert_eq!(DEFAULT_SAMPLE_SIZE, 102_400);
         assert_eq!(HEADER_BUFFER_SIZE, 1024);
+        assert_eq!(DEFAULT_CHUNK_SIZE, 65_536);
+        assert_eq!(DEFAULT_MAX_CONCURRENCY, 8);
     }
 }

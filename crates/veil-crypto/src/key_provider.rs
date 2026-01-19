@@ -572,4 +572,60 @@ mod tests {
 
         assert!(matches!(result, Err(CryptoError::KeyManagement(_))));
     }
+
+    #[test]
+    fn test_local_key_provider_rotation_increments_version() {
+        let temp_dir = TempDir::new().unwrap();
+        let key_path = temp_dir.path().join("keys.jsonl");
+
+        let provider =
+            LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
+
+        provider.rotate_key("rotate-key").unwrap();
+        provider.rotate_key("rotate-key").unwrap();
+
+        let keys = provider.list_keys().unwrap();
+        let key = keys.into_iter().find(|k| k.key_id == "rotate-key").unwrap();
+        assert_eq!(key.version, 2);
+    }
+
+    #[test]
+    fn test_env_key_provider_list_keys() {
+        let prefix = "TEST_VEIL_KEY_LIST_";
+        let var_name = format!("{prefix}mykey");
+        std::env::set_var(&var_name, "ignored-by-listing");
+
+        let provider = EnvKeyProvider::new(prefix);
+        let keys = provider.list_keys().unwrap();
+
+        assert!(keys.iter().any(|k| k.key_id == "mykey"));
+
+        std::env::remove_var(&var_name);
+    }
+
+    #[test]
+    fn test_secret_key_debug_redacts_bytes() {
+        let bytes = [42u8; 32];
+        let key = SecretKey::from_slice(&bytes);
+        let debug = format!("{:?}", key);
+
+        assert!(debug.contains("SecretKey"));
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains("42"));
+    }
+
+    #[test]
+    fn test_local_key_provider_debug_includes_path_and_key_count() {
+        let temp_dir = TempDir::new().unwrap();
+        let key_path = temp_dir.path().join("keys.jsonl");
+
+        let provider =
+            LocalKeyProvider::new(&key_path, PlaintextStoragePolicy::allow_insecure()).unwrap();
+        provider.rotate_key("debug-key").unwrap();
+
+        let debug = format!("{:?}", provider);
+        assert!(debug.contains("LocalKeyProvider"));
+        assert!(debug.contains("keys.jsonl"));
+        assert!(debug.contains("key_count"));
+    }
 }
