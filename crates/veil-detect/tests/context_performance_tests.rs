@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+#![cfg(not(coverage))]
 //! Performance tests for context detection.
 //!
 //! These tests verify that context analysis adds less than 10% overhead

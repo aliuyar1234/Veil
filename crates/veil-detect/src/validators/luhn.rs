@@ -7,6 +7,7 @@
 ///
 /// # Returns
 /// `true` if the number passes the Luhn check, `false` otherwise
+#[allow(clippy::manual_is_multiple_of)] // keep MSRV compatibility (is_multiple_of stabilized after 1.85)
 pub fn validate_luhn(number: &str) -> bool {
     // Extract only digits
     let digits: Vec<u32> = number
@@ -39,7 +40,7 @@ pub fn validate_luhn(number: &str) -> bool {
         })
         .sum();
 
-    sum.is_multiple_of(10)
+    sum % 10 == 0
 }
 
 #[cfg(test)]

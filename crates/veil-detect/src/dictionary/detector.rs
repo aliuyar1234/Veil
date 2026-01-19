@@ -276,7 +276,7 @@ fn deduplicate_matches(matches: &mut Vec<DictionaryMatch>) {
     matches.sort_by(|a, b| {
         a.start
             .cmp(&b.start)
-            .then_with(|| b.confidence.partial_cmp(&a.confidence).unwrap())
+            .then_with(|| b.confidence.total_cmp(&a.confidence))
     });
 
     // Remove overlapping matches, keeping highest confidence

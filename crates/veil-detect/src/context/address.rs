@@ -217,86 +217,132 @@ impl AddressDetector {
     fn detect_english(&self, text: &str) -> Vec<AddressBlock> {
         let mut blocks = Vec::new();
         let lines: Vec<&str> = text.lines().collect();
+        let line_offsets = self.line_offsets(text);
 
         // Look for multi-line addresses
         for (i, line) in lines.iter().enumerate() {
             // Check for street address
             if let Some(street_match) = US_STREET_REGEX.find(line) {
+                let line_start = self.line_offset(&line_offsets, i);
                 let mut block = AddressBlock::new(
-                    self.line_offset(&lines, i) + street_match.start(),
+                    line_start + street_match.start(),
                     0, // Will be updated
                     "",
                     AddressFormat::En,
                 );
+                let mut country_line: Option<usize> = None;
+                let mut uses_next_line = false;
 
                 block.add_component(AddressComponent {
                     component_type: AddressComponentType::Street,
                     text: street_match.as_str().to_string(),
-                    start: block.start,
-                    end: block.start + street_match.as_str().len(),
+                    start: line_start + street_match.start(),
+                    end: line_start + street_match.end(),
                 });
 
-                // Look for city, state, zip on same or next line
-                let search_text = if i + 1 < lines.len() {
-                    format!("{} {}", line, lines[i + 1])
-                } else {
-                    line.to_string()
-                };
-
-                if let Some(caps) = US_CITY_STATE_ZIP_REGEX.captures(&search_text) {
+                // Prefer city/state/zip on the following line to avoid cross-line captures like
+                // "Main Street New York, NY 10001".
+                if i + 1 < lines.len() {
+                    if let Some(caps) = US_CITY_STATE_ZIP_REGEX.captures(lines[i + 1]) {
+                        uses_next_line = true;
+                        if let (Some(city), Some(state), Some(zip)) =
+                            (caps.get(1), caps.get(2), caps.get(3))
+                        {
+                            let base_offset = self.line_offset(&line_offsets, i + 1);
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::City,
+                                text: city.as_str().to_string(),
+                                start: base_offset + city.start(),
+                                end: base_offset + city.end(),
+                            });
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::State,
+                                text: state.as_str().to_string(),
+                                start: base_offset + state.start(),
+                                end: base_offset + state.end(),
+                            });
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::PostalCode,
+                                text: zip.as_str().to_string(),
+                                start: base_offset + zip.start(),
+                                end: base_offset + zip.end(),
+                            });
+                        }
+                    } else if let Some(caps) = US_CITY_STATE_ZIP_REGEX.captures(line) {
+                        if let (Some(city), Some(state), Some(zip)) =
+                            (caps.get(1), caps.get(2), caps.get(3))
+                        {
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::City,
+                                text: city.as_str().to_string(),
+                                start: line_start + city.start(),
+                                end: line_start + city.end(),
+                            });
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::State,
+                                text: state.as_str().to_string(),
+                                start: line_start + state.start(),
+                                end: line_start + state.end(),
+                            });
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::PostalCode,
+                                text: zip.as_str().to_string(),
+                                start: line_start + zip.start(),
+                                end: line_start + zip.end(),
+                            });
+                        }
+                    }
+                } else if let Some(caps) = US_CITY_STATE_ZIP_REGEX.captures(line) {
                     if let (Some(city), Some(state), Some(zip)) =
                         (caps.get(1), caps.get(2), caps.get(3))
                     {
-                        let base_offset = self.line_offset(&lines, i);
-
                         block.add_component(AddressComponent {
                             component_type: AddressComponentType::City,
                             text: city.as_str().to_string(),
-                            start: base_offset + city.start(),
-                            end: base_offset + city.end(),
+                            start: line_start + city.start(),
+                            end: line_start + city.end(),
                         });
-
                         block.add_component(AddressComponent {
                             component_type: AddressComponentType::State,
                             text: state.as_str().to_string(),
-                            start: base_offset + state.start(),
-                            end: base_offset + state.end(),
+                            start: line_start + state.start(),
+                            end: line_start + state.end(),
                         });
-
                         block.add_component(AddressComponent {
                             component_type: AddressComponentType::PostalCode,
                             text: zip.as_str().to_string(),
-                            start: base_offset + zip.start(),
-                            end: base_offset + zip.end(),
+                            start: line_start + zip.start(),
+                            end: line_start + zip.end(),
                         });
-
-                        // Update end position
-                        block.end = base_offset + zip.end();
                     }
                 }
 
                 // Check for country on following lines
                 if i + 2 < lines.len() {
                     if let Some(country_match) = COUNTRY_REGEX.find(lines[i + 2]) {
-                        let offset = self.line_offset(&lines, i + 2);
+                        let offset = self.line_offset(&line_offsets, i + 2);
                         block.add_component(AddressComponent {
                             component_type: AddressComponentType::Country,
                             text: country_match.as_str().to_string(),
                             start: offset + country_match.start(),
                             end: offset + country_match.end(),
                         });
-                        block.end = offset + country_match.end();
+                        country_line = Some(i + 2);
                     }
                 }
 
-                // Build full text
-                let end_line = if block.components.len() > 1 {
-                    i + 2
-                } else {
-                    i + 1
-                };
-                let full_text: String = lines[i..end_line.min(lines.len())].join("\n");
-                block.full_text = full_text;
+                let mut last_line = i;
+                if uses_next_line {
+                    last_line = i + 1;
+                }
+                if let Some(cl) = country_line {
+                    last_line = cl;
+                }
+                block.end = self.line_offset(&line_offsets, last_line) + lines[last_line].len();
+                block.full_text = text
+                    .get(block.start..block.end)
+                    .unwrap_or_default()
+                    .to_string();
 
                 block.calculate_confidence();
                 if block.is_valid() {
@@ -359,13 +405,16 @@ impl AddressDetector {
     fn detect_german(&self, text: &str) -> Vec<AddressBlock> {
         let mut blocks = Vec::new();
         let lines: Vec<&str> = text.lines().collect();
+        let line_offsets = self.line_offsets(text);
 
         for (i, line) in lines.iter().enumerate() {
             // German: Street with number (Hauptstraße 42)
             if let Some(street_match) = DE_STREET_REGEX.find(line) {
-                let line_start = self.line_offset(&lines, i);
+                let line_start = self.line_offset(&line_offsets, i);
                 let mut block =
                     AddressBlock::new(line_start + street_match.start(), 0, "", AddressFormat::De);
+                let mut uses_next_line = false;
+                let mut country_line: Option<usize> = None;
 
                 block.add_component(AddressComponent {
                     component_type: AddressComponentType::Street,
@@ -374,56 +423,89 @@ impl AddressDetector {
                     end: line_start + street_match.end(),
                 });
 
-                // Look for PLZ + City on same or next line
-                let search_text = if i + 1 < lines.len() {
-                    format!("{} {}", line, lines[i + 1])
-                } else {
-                    line.to_string()
-                };
-
-                if let Some(caps) = DE_PLZ_CITY_REGEX.captures(&search_text) {
+                // Prefer PLZ + City on the following line to avoid cross-line captures like
+                // "80331 Muenchen Germany".
+                if i + 1 < lines.len() {
+                    if let Some(caps) = DE_PLZ_CITY_REGEX.captures(lines[i + 1]) {
+                        uses_next_line = true;
+                        if let (Some(plz), Some(city)) = (caps.get(1), caps.get(2)) {
+                            let offset = self.line_offset(&line_offsets, i + 1);
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::PostalCode,
+                                text: plz.as_str().to_string(),
+                                start: offset + plz.start(),
+                                end: offset + plz.end(),
+                            });
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::City,
+                                text: city.as_str().to_string(),
+                                start: offset + city.start(),
+                                end: offset + city.end(),
+                            });
+                        }
+                    } else if let Some(caps) = DE_PLZ_CITY_REGEX.captures(line) {
+                        if let (Some(plz), Some(city)) = (caps.get(1), caps.get(2)) {
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::PostalCode,
+                                text: plz.as_str().to_string(),
+                                start: line_start + plz.start(),
+                                end: line_start + plz.end(),
+                            });
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::City,
+                                text: city.as_str().to_string(),
+                                start: line_start + city.start(),
+                                end: line_start + city.end(),
+                            });
+                        }
+                    }
+                } else if let Some(caps) = DE_PLZ_CITY_REGEX.captures(line) {
                     if let (Some(plz), Some(city)) = (caps.get(1), caps.get(2)) {
-                        let offset = if plz.start() > line.len() {
-                            self.line_offset(&lines, i + 1) - line.len() - 1
-                        } else {
-                            line_start
-                        };
-
                         block.add_component(AddressComponent {
                             component_type: AddressComponentType::PostalCode,
                             text: plz.as_str().to_string(),
-                            start: offset + plz.start(),
-                            end: offset + plz.end(),
+                            start: line_start + plz.start(),
+                            end: line_start + plz.end(),
                         });
-
                         block.add_component(AddressComponent {
                             component_type: AddressComponentType::City,
                             text: city.as_str().to_string(),
-                            start: offset + city.start(),
-                            end: offset + city.end(),
+                            start: line_start + city.start(),
+                            end: line_start + city.end(),
                         });
-
-                        block.end = offset + city.end();
                     }
                 }
 
                 // Check for country
-                let country_line = if i + 1 < lines.len() { i + 1 } else { i };
-                if let Some(country_match) =
-                    COUNTRY_REGEX.find(lines.get(country_line).unwrap_or(&""))
-                {
-                    let offset = self.line_offset(&lines, country_line);
-                    block.add_component(AddressComponent {
-                        component_type: AddressComponentType::Country,
-                        text: country_match.as_str().to_string(),
-                        start: offset + country_match.start(),
-                        end: offset + country_match.end(),
-                    });
+                for candidate in [i + 2, i + 1, i] {
+                    if candidate >= lines.len() {
+                        continue;
+                    }
+                    if let Some(country_match) = COUNTRY_REGEX.find(lines[candidate]) {
+                        let offset = self.line_offset(&line_offsets, candidate);
+                        block.add_component(AddressComponent {
+                            component_type: AddressComponentType::Country,
+                            text: country_match.as_str().to_string(),
+                            start: offset + country_match.start(),
+                            end: offset + country_match.end(),
+                        });
+                        country_line = Some(candidate);
+                        break;
+                    }
                 }
 
-                // Build full text
-                let end_line = (i + 2).min(lines.len());
-                block.full_text = lines[i..end_line].join("\n");
+                let mut last_line = i;
+                if uses_next_line {
+                    last_line = i + 1;
+                }
+                if let Some(cl) = country_line {
+                    last_line = cl;
+                }
+                block.end = self.line_offset(&line_offsets, last_line) + lines[last_line].len();
+                block.full_text = text
+                    .get(block.start..block.end)
+                    .unwrap_or_default()
+                    .to_string();
 
                 block.calculate_confidence();
                 if block.is_valid() {
@@ -477,13 +559,16 @@ impl AddressDetector {
     fn detect_french(&self, text: &str) -> Vec<AddressBlock> {
         let mut blocks = Vec::new();
         let lines: Vec<&str> = text.lines().collect();
+        let line_offsets = self.line_offsets(text);
 
         for (i, line) in lines.iter().enumerate() {
             // French: Number + street type + name (42 rue de la Paix)
             if let Some(street_match) = FR_STREET_REGEX.find(line) {
-                let line_start = self.line_offset(&lines, i);
+                let line_start = self.line_offset(&line_offsets, i);
                 let mut block =
                     AddressBlock::new(line_start + street_match.start(), 0, "", AddressFormat::Fr);
+                let mut uses_next_line = false;
+                let mut country_line: Option<usize> = None;
 
                 block.add_component(AddressComponent {
                     component_type: AddressComponentType::Street,
@@ -492,55 +577,85 @@ impl AddressDetector {
                     end: line_start + street_match.end(),
                 });
 
-                // Look for code postal + city on same or next line
-                let search_text = if i + 1 < lines.len() {
-                    format!("{} {}", line, lines[i + 1])
-                } else {
-                    line.to_string()
-                };
-
-                if let Some(caps) = FR_CP_CITY_REGEX.captures(&search_text) {
+                // Prefer code postal + city on the following line to avoid cross-line captures like
+                // "75002 Paris Ignore".
+                if i + 1 < lines.len() {
+                    if let Some(caps) = FR_CP_CITY_REGEX.captures(lines[i + 1]) {
+                        uses_next_line = true;
+                        if let (Some(cp), Some(city)) = (caps.get(1), caps.get(2)) {
+                            let offset = self.line_offset(&line_offsets, i + 1);
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::PostalCode,
+                                text: cp.as_str().to_string(),
+                                start: offset + cp.start(),
+                                end: offset + cp.end(),
+                            });
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::City,
+                                text: city.as_str().to_string(),
+                                start: offset + city.start(),
+                                end: offset + city.end(),
+                            });
+                        }
+                    } else if let Some(caps) = FR_CP_CITY_REGEX.captures(line) {
+                        if let (Some(cp), Some(city)) = (caps.get(1), caps.get(2)) {
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::PostalCode,
+                                text: cp.as_str().to_string(),
+                                start: line_start + cp.start(),
+                                end: line_start + cp.end(),
+                            });
+                            block.add_component(AddressComponent {
+                                component_type: AddressComponentType::City,
+                                text: city.as_str().to_string(),
+                                start: line_start + city.start(),
+                                end: line_start + city.end(),
+                            });
+                        }
+                    }
+                } else if let Some(caps) = FR_CP_CITY_REGEX.captures(line) {
                     if let (Some(cp), Some(city)) = (caps.get(1), caps.get(2)) {
-                        let offset = if cp.start() > line.len() {
-                            self.line_offset(&lines, i + 1) - line.len() - 1
-                        } else {
-                            line_start
-                        };
-
                         block.add_component(AddressComponent {
                             component_type: AddressComponentType::PostalCode,
                             text: cp.as_str().to_string(),
-                            start: offset + cp.start(),
-                            end: offset + cp.end(),
+                            start: line_start + cp.start(),
+                            end: line_start + cp.end(),
                         });
-
                         block.add_component(AddressComponent {
                             component_type: AddressComponentType::City,
                             text: city.as_str().to_string(),
-                            start: offset + city.start(),
-                            end: offset + city.end(),
+                            start: line_start + city.start(),
+                            end: line_start + city.end(),
                         });
-
-                        block.end = offset + city.end();
                     }
                 }
 
                 // Check for country
                 if i + 2 < lines.len() {
                     if let Some(country_match) = COUNTRY_REGEX.find(lines[i + 2]) {
-                        let offset = self.line_offset(&lines, i + 2);
+                        let offset = self.line_offset(&line_offsets, i + 2);
                         block.add_component(AddressComponent {
                             component_type: AddressComponentType::Country,
                             text: country_match.as_str().to_string(),
                             start: offset + country_match.start(),
                             end: offset + country_match.end(),
                         });
+                        country_line = Some(i + 2);
                     }
                 }
 
-                // Build full text
-                let end_line = (i + 2).min(lines.len());
-                block.full_text = lines[i..end_line].join("\n");
+                let mut last_line = i;
+                if uses_next_line {
+                    last_line = i + 1;
+                }
+                if let Some(cl) = country_line {
+                    last_line = cl;
+                }
+                block.end = self.line_offset(&line_offsets, last_line) + lines[last_line].len();
+                block.full_text = text
+                    .get(block.start..block.end)
+                    .unwrap_or_default()
+                    .to_string();
 
                 block.calculate_confidence();
                 if block.is_valid() {
@@ -590,12 +705,19 @@ impl AddressDetector {
         blocks
     }
 
-    /// Calculate byte offset for a line in the text.
-    fn line_offset(&self, lines: &[&str], line_index: usize) -> usize {
-        lines[..line_index]
-            .iter()
-            .map(|l| l.len() + 1) // +1 for newline
-            .sum()
+    fn line_offsets(&self, text: &str) -> Vec<usize> {
+        let mut offsets = Vec::new();
+        offsets.push(0);
+        for (idx, b) in text.bytes().enumerate() {
+            if b == b'\n' {
+                offsets.push(idx + 1);
+            }
+        }
+        offsets
+    }
+
+    fn line_offset(&self, line_offsets: &[usize], line_index: usize) -> usize {
+        line_offsets.get(line_index).copied().unwrap_or(0)
     }
 }
 
@@ -609,45 +731,340 @@ impl Default for AddressDetector {
 mod tests {
     use super::*;
 
+    fn assert_approx_eq(actual: f32, expected: f32) {
+        let diff = (actual - expected).abs();
+        assert!(
+            diff < 1e-6,
+            "expected {expected}, got {actual} (diff {diff})"
+        );
+    }
+
+    fn find_component<'a>(
+        block: &'a AddressBlock,
+        component_type: AddressComponentType,
+    ) -> &'a AddressComponent {
+        block
+            .components
+            .iter()
+            .find(|c| c.component_type == component_type)
+            .expect("missing component")
+    }
+
     #[test]
-    fn test_us_address_detection() {
+    fn test_confidence_scores() {
+        let mut block = AddressBlock::new(0, 0, "", AddressFormat::En);
+        block.add_component(AddressComponent {
+            component_type: AddressComponentType::Street,
+            text: "123 Main Street".to_string(),
+            start: 0,
+            end: 0,
+        });
+        block.calculate_confidence();
+        assert_approx_eq(block.confidence, 0.45);
+        assert!(!block.is_valid());
+
+        let mut block = AddressBlock::new(0, 0, "", AddressFormat::En);
+        block.add_component(AddressComponent {
+            component_type: AddressComponentType::City,
+            text: "New York".to_string(),
+            start: 0,
+            end: 0,
+        });
+        block.calculate_confidence();
+        assert_approx_eq(block.confidence, 0.4);
+
+        let mut block = AddressBlock::new(0, 0, "", AddressFormat::En);
+        block.add_component(AddressComponent {
+            component_type: AddressComponentType::PostalCode,
+            text: "10001".to_string(),
+            start: 0,
+            end: 0,
+        });
+        block.calculate_confidence();
+        assert_approx_eq(block.confidence, 0.4);
+
+        let mut block = AddressBlock::new(0, 0, "", AddressFormat::En);
+        block.add_component(AddressComponent {
+            component_type: AddressComponentType::Country,
+            text: "United States".to_string(),
+            start: 0,
+            end: 0,
+        });
+        block.calculate_confidence();
+        assert_approx_eq(block.confidence, 0.35);
+
+        let mut block = AddressBlock::new(0, 0, "", AddressFormat::En);
+        block.add_component(AddressComponent {
+            component_type: AddressComponentType::Street,
+            text: "123 Main Street".to_string(),
+            start: 0,
+            end: 0,
+        });
+        block.add_component(AddressComponent {
+            component_type: AddressComponentType::City,
+            text: "New York".to_string(),
+            start: 0,
+            end: 0,
+        });
+        block.add_component(AddressComponent {
+            component_type: AddressComponentType::PostalCode,
+            text: "10001".to_string(),
+            start: 0,
+            end: 0,
+        });
+        block.add_component(AddressComponent {
+            component_type: AddressComponentType::Country,
+            text: "United States".to_string(),
+            start: 0,
+            end: 0,
+        });
+        block.calculate_confidence();
+        assert_approx_eq(block.confidence, 1.0);
+        assert!(block.is_valid());
+    }
+
+    #[test]
+    fn test_is_valid_requires_minimum_confidence() {
+        let mut block = AddressBlock::new(0, 0, "", AddressFormat::En);
+        block.add_component(AddressComponent {
+            component_type: AddressComponentType::State,
+            text: "NY".to_string(),
+            start: 0,
+            end: 0,
+        });
+        block.add_component(AddressComponent {
+            component_type: AddressComponentType::FullLine,
+            text: "not a strong address".to_string(),
+            start: 0,
+            end: 0,
+        });
+        block.calculate_confidence();
+        assert_approx_eq(block.confidence, 0.2);
+        assert!(!block.is_valid());
+    }
+
+    #[test]
+    fn test_line_offsets_handle_crlf_and_lf() {
+        let detector = AddressDetector::new(AddressFormat::En);
+        let text = "a\r\nb\nc";
+        let offsets = detector.line_offsets(text);
+        assert_eq!(offsets, vec![0, 3, 5]);
+        assert_eq!(detector.line_offset(&offsets, 0), 0);
+        assert_eq!(detector.line_offset(&offsets, 1), 3);
+        assert_eq!(detector.line_offset(&offsets, 2), 5);
+    }
+
+    #[test]
+    fn test_us_address_detection_no_country_no_duplicates() {
         let detector = AddressDetector::new(AddressFormat::En);
         let text = "123 Main Street\nNew York, NY 10001";
         let blocks = detector.detect(text);
 
-        assert!(!blocks.is_empty());
+        assert_eq!(blocks.len(), 1);
         let block = &blocks[0];
         assert_eq!(block.format, AddressFormat::En);
+        assert_eq!(block.start, 0);
+        assert_eq!(block.end, text.len());
+        assert_eq!(block.full_text, text);
+
+        let street = find_component(block, AddressComponentType::Street);
+        assert_eq!(street.text, "123 Main Street");
+        assert_eq!(
+            street.start,
+            text.find("123 Main Street").expect("street start")
+        );
+        assert_eq!(street.end, street.start + street.text.len());
+
+        let city = find_component(block, AddressComponentType::City);
+        assert_eq!(city.text, "New York");
+        assert_eq!(city.start, text.find("New York").expect("city start"));
+        assert_eq!(city.end, city.start + city.text.len());
+
+        let state = find_component(block, AddressComponentType::State);
+        assert_eq!(state.text, "NY");
+        assert_eq!(state.start, text.find("NY").expect("state start"));
+        assert_eq!(state.end, state.start + state.text.len());
+
+        let zip = find_component(block, AddressComponentType::PostalCode);
+        assert_eq!(zip.text, "10001");
+        assert_eq!(zip.start, text.find("10001").expect("zip start"));
+        assert_eq!(zip.end, zip.start + zip.text.len());
+
         assert!(block
             .components
             .iter()
-            .any(|c| c.component_type == AddressComponentType::Street));
+            .all(|c| c.start >= block.start && c.end <= block.end));
     }
 
     #[test]
-    fn test_german_address_detection() {
-        let detector = AddressDetector::new(AddressFormat::De);
-        let text = "Hauptstraße 42\n80331 München";
+    fn test_us_address_detection_city_line_with_prefix_offsets() {
+        let detector = AddressDetector::new(AddressFormat::En);
+        let text = "123 Main Street\nAttn: New York, NY 10001";
         let blocks = detector.detect(text);
 
-        assert!(!blocks.is_empty());
+        assert_eq!(blocks.len(), 1);
         let block = &blocks[0];
-        assert_eq!(block.format, AddressFormat::De);
-        assert!(block
-            .components
-            .iter()
-            .any(|c| c.component_type == AddressComponentType::PostalCode));
+
+        let city = find_component(block, AddressComponentType::City);
+        assert_eq!(city.text, "New York");
+        assert_eq!(city.start, text.find("New York").expect("city start"));
+        assert_eq!(city.end, city.start + city.text.len());
+
+        let state = find_component(block, AddressComponentType::State);
+        assert_eq!(state.text, "NY");
+        assert_eq!(state.start, text.find("NY").expect("state start"));
+        assert_eq!(state.end, state.start + state.text.len());
+
+        let zip = find_component(block, AddressComponentType::PostalCode);
+        assert_eq!(zip.text, "10001");
+        assert_eq!(zip.start, text.find("10001").expect("zip start"));
+        assert_eq!(zip.end, zip.start + zip.text.len());
     }
 
     #[test]
-    fn test_french_address_detection() {
-        let detector = AddressDetector::new(AddressFormat::Fr);
-        let text = "42 rue de la Paix\n75002 Paris";
+    fn test_us_address_detection_same_line_city_state_zip_branch() {
+        let detector = AddressDetector::new(AddressFormat::En);
+        let text = "123 Main Street, New York, NY 10001\nNote: keep this out of the address block";
         let blocks = detector.detect(text);
 
-        assert!(!blocks.is_empty());
+        assert_eq!(blocks.len(), 1);
         let block = &blocks[0];
-        assert_eq!(block.format, AddressFormat::Fr);
+        assert_eq!(block.start, 0);
+        assert_eq!(block.end, text.find('\n').expect("newline"));
+        assert_eq!(block.full_text, "123 Main Street, New York, NY 10001");
+
+        let city = find_component(block, AddressComponentType::City);
+        assert_eq!(city.text, "New York");
+        assert_eq!(city.start, text.find("New York").expect("city start"));
+        assert_eq!(city.end, city.start + city.text.len());
+
+        let state = find_component(block, AddressComponentType::State);
+        assert_eq!(state.text, "NY");
+        assert_eq!(state.start, text.find("NY").expect("state start"));
+        assert_eq!(state.end, state.start + state.text.len());
+
+        let zip = find_component(block, AddressComponentType::PostalCode);
+        assert_eq!(zip.text, "10001");
+        assert_eq!(zip.start, text.find("10001").expect("zip start"));
+        assert_eq!(zip.end, zip.start + zip.text.len());
+    }
+
+    #[test]
+    fn test_us_address_detection_single_line_street_and_city_state_zip() {
+        let detector = AddressDetector::new(AddressFormat::En);
+        let text = "123 Main Street, New York, NY 10001";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(block.format, AddressFormat::En);
+        assert_eq!(block.start, 0);
+        assert_eq!(block.end, text.len());
+        assert_eq!(block.full_text, text);
+
+        let city = find_component(block, AddressComponentType::City);
+        assert_eq!(city.text, "New York");
+        assert_eq!(city.start, text.find("New York").expect("city start"));
+        assert_eq!(city.end, city.start + city.text.len());
+
+        let state = find_component(block, AddressComponentType::State);
+        assert_eq!(state.text, "NY");
+        assert_eq!(state.start, text.find("NY").expect("state start"));
+        assert_eq!(state.end, state.start + state.text.len());
+
+        let zip = find_component(block, AddressComponentType::PostalCode);
+        assert_eq!(zip.text, "10001");
+        assert_eq!(zip.start, text.find("10001").expect("zip start"));
+        assert_eq!(zip.end, zip.start + zip.text.len());
+    }
+
+    #[test]
+    fn test_us_address_with_country_line_prefix_offsets() {
+        let detector = AddressDetector::new(AddressFormat::En);
+        let text = "123 Main Street\nNew York, NY 10001\nCountry: United States";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(block.format, AddressFormat::En);
+        assert_eq!(block.start, 0);
+        assert_eq!(block.end, text.len());
+        assert_eq!(block.full_text, text);
+
+        let country = find_component(block, AddressComponentType::Country);
+        assert_eq!(country.text, "United States");
+        assert_eq!(
+            country.start,
+            text.find("United States").expect("country start")
+        );
+        assert_eq!(country.end, country.start + country.text.len());
+    }
+
+    #[test]
+    fn test_us_single_line_city_state_zip_not_suppressed_by_later_block() {
+        let detector = AddressDetector::new(AddressFormat::En);
+        let text = "Header: New York, NY 10001\n123 Main Street\nNew York, NY 10001";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 2);
+
+        let header_match_start = text.find("New York, NY 10001").expect("header match");
+        let street_match_start = text.find("123 Main Street").expect("street match");
+
+        assert!(blocks.iter().any(|b| b.start == header_match_start));
+        assert!(blocks.iter().any(|b| b.start == street_match_start));
+    }
+
+    #[test]
+    fn test_us_street_not_at_line_start() {
+        let detector = AddressDetector::new(AddressFormat::En);
+        let text = "Ship to: 123 Main Street\nNew York, NY 10001";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(
+            block.start,
+            text.find("123 Main Street").expect("street start")
+        );
+        assert_eq!(block.end, text.len());
+        assert_eq!(block.full_text, "123 Main Street\nNew York, NY 10001");
+
+        let street = find_component(block, AddressComponentType::Street);
+        assert_eq!(street.text, "123 Main Street");
+        assert_eq!(street.start, block.start);
+        assert_eq!(street.end, street.start + street.text.len());
+    }
+
+    #[test]
+    fn test_us_street_on_last_line_is_safe() {
+        let detector = AddressDetector::new(AddressFormat::En);
+        let text = "Hello\n123 Main Street";
+        let blocks = detector.detect(text);
+
+        assert!(blocks.is_empty());
+    }
+
+    #[test]
+    fn test_us_address_with_country_offsets_and_full_text() {
+        let detector = AddressDetector::new(AddressFormat::En);
+        let text = "123 Main Street\nNew York, NY 10001\nUnited States";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(block.format, AddressFormat::En);
+        assert_eq!(block.start, 0);
+        assert_eq!(block.end, text.len());
+        assert_eq!(block.full_text, text);
+
+        let country = find_component(block, AddressComponentType::Country);
+        assert_eq!(country.text, "United States");
+        assert_eq!(
+            country.start,
+            text.find("United States").expect("country start")
+        );
+        assert_eq!(country.end, country.start + country.text.len());
     }
 
     #[test]
@@ -669,34 +1086,341 @@ mod tests {
     }
 
     #[test]
-    fn test_address_with_country() {
-        let detector = AddressDetector::new(AddressFormat::En);
-        let text = "123 Main Street\nNew York, NY 10001\nUnited States";
+    fn test_german_address_with_country_crlf_offsets_and_full_text() {
+        let detector = AddressDetector::new(AddressFormat::De);
+        let text = "Hauptstr. 42\r\n80331 Muenchen\r\nGermany";
         let blocks = detector.detect(text);
 
-        assert!(!blocks.is_empty());
-        // May or may not detect country depending on multi-line handling
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(block.format, AddressFormat::De);
+        assert_eq!(block.start, 0);
+        assert_eq!(block.end, text.len());
+        assert_eq!(block.full_text, text);
+
+        let street = find_component(block, AddressComponentType::Street);
+        assert_eq!(street.text, "Hauptstr. 42");
+        assert_eq!(
+            street.start,
+            text.find("Hauptstr. 42").expect("street start")
+        );
+        assert_eq!(street.end, street.start + street.text.len());
+
+        let plz = find_component(block, AddressComponentType::PostalCode);
+        assert_eq!(plz.text, "80331");
+        assert_eq!(plz.start, text.find("80331").expect("plz start"));
+        assert_eq!(plz.end, plz.start + plz.text.len());
+
+        let city = find_component(block, AddressComponentType::City);
+        assert_eq!(city.text, "Muenchen");
+        assert_eq!(city.start, text.find("Muenchen").expect("city start"));
+        assert_eq!(city.end, city.start + city.text.len());
+
+        let country = find_component(block, AddressComponentType::Country);
+        assert_eq!(country.text, "Germany");
+        assert_eq!(country.start, text.find("Germany").expect("country start"));
+        assert_eq!(country.end, country.start + country.text.len());
     }
 
     #[test]
-    fn test_confidence_calculation() {
-        let mut block = AddressBlock::new(0, 50, "test", AddressFormat::En);
-        block.add_component(AddressComponent {
-            component_type: AddressComponentType::Street,
-            text: "123 Main St".to_string(),
-            start: 0,
-            end: 11,
-        });
-        block.add_component(AddressComponent {
-            component_type: AddressComponentType::City,
-            text: "New York".to_string(),
-            start: 12,
-            end: 20,
-        });
-        block.calculate_confidence();
+    fn test_german_address_without_country_uses_next_line_for_end() {
+        let detector = AddressDetector::new(AddressFormat::De);
+        let text = "Hauptstr. 42\r\n80331 Muenchen";
+        let blocks = detector.detect(text);
 
-        assert!(block.confidence > 0.5);
-        assert!(block.is_valid());
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(block.start, 0);
+        assert_eq!(block.end, text.len());
+        assert_eq!(block.full_text, text);
+    }
+
+    #[test]
+    fn test_german_plz_city_on_same_line_with_following_line() {
+        let detector = AddressDetector::new(AddressFormat::De);
+        let text = "Hauptstr. 42 80331 Muenchen\r\nGermany";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+
+        let plz = find_component(block, AddressComponentType::PostalCode);
+        assert_eq!(plz.text, "80331");
+        assert_eq!(plz.start, text.find("80331").expect("plz start"));
+        assert_eq!(plz.end, plz.start + plz.text.len());
+
+        let city = find_component(block, AddressComponentType::City);
+        assert_eq!(city.text, "Muenchen");
+        assert_eq!(city.start, text.find("Muenchen").expect("city start"));
+        assert_eq!(city.end, city.start + city.text.len());
+    }
+
+    #[test]
+    fn test_german_street_and_country_two_lines() {
+        let detector = AddressDetector::new(AddressFormat::De);
+        let text = "Hauptstr. 42\nGermany";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        let country = find_component(block, AddressComponentType::Country);
+        assert_eq!(country.text, "Germany");
+    }
+
+    #[test]
+    fn test_german_country_line_prefix_offsets() {
+        let detector = AddressDetector::new(AddressFormat::De);
+        let text = "Hauptstr. 42\r\n80331 Muenchen\r\nCountry: Germany";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        let country = find_component(block, AddressComponentType::Country);
+        assert_eq!(country.text, "Germany");
+        assert_eq!(country.start, text.find("Germany").expect("country start"));
+        assert_eq!(country.end, country.start + country.text.len());
+    }
+
+    #[test]
+    fn test_german_street_not_at_line_start_and_plz_line_prefix_offsets() {
+        let detector = AddressDetector::new(AddressFormat::De);
+        let text = "Header\r\nAddr: Hauptstr. 42\r\nPLZ: 80331 Muenchen";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(
+            block.start,
+            text.find("Hauptstr. 42").expect("street match")
+        );
+        assert_eq!(block.full_text, "Hauptstr. 42\r\nPLZ: 80331 Muenchen");
+
+        let street = find_component(block, AddressComponentType::Street);
+        assert_eq!(street.text, "Hauptstr. 42");
+        assert_eq!(street.start, block.start);
+        assert_eq!(street.end, street.start + street.text.len());
+
+        let plz = find_component(block, AddressComponentType::PostalCode);
+        assert_eq!(plz.text, "80331");
+        assert_eq!(plz.start, text.find("80331").expect("plz start"));
+        assert_eq!(plz.end, plz.start + plz.text.len());
+    }
+
+    #[test]
+    fn test_german_single_line_street_and_plz_city() {
+        let detector = AddressDetector::new(AddressFormat::De);
+        let text = "Hauptstr. 42 80331 Muenchen";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(block.full_text, text);
+
+        let plz = find_component(block, AddressComponentType::PostalCode);
+        assert_eq!(plz.text, "80331");
+        assert_eq!(plz.start, text.find("80331").expect("plz start"));
+        assert_eq!(plz.end, plz.start + plz.text.len());
+
+        let city = find_component(block, AddressComponentType::City);
+        assert_eq!(city.text, "Muenchen");
+        assert_eq!(city.start, text.find("Muenchen").expect("city start"));
+        assert_eq!(city.end, city.start + city.text.len());
+    }
+
+    #[test]
+    fn test_german_street_on_last_line_is_safe() {
+        let detector = AddressDetector::new(AddressFormat::De);
+        let text = "Hello\r\nHauptstr. 42";
+        let blocks = detector.detect(text);
+
+        assert!(blocks.is_empty());
+    }
+
+    #[test]
+    fn test_german_single_line_plz_city_not_suppressed_by_later_block() {
+        let detector = AddressDetector::new(AddressFormat::De);
+        let text = "Header: 10115 Berlin\nHauptstr. 42\n80331 Muenchen";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 2);
+
+        let header_match_start = text.find("10115 Berlin").expect("header match");
+        let street_match_start = text.find("Hauptstr. 42").expect("street match");
+
+        assert!(blocks.iter().any(|b| b.start == header_match_start));
+        assert!(blocks.iter().any(|b| b.start == street_match_start));
+    }
+
+    #[test]
+    fn test_french_address_with_country_crlf_offsets_and_full_text() {
+        let detector = AddressDetector::new(AddressFormat::Fr);
+        let text = "42 rue de la Paix\r\n75002 Paris\r\nFrance";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(block.format, AddressFormat::Fr);
+        assert_eq!(block.start, 0);
+        assert_eq!(block.end, text.len());
+        assert_eq!(block.full_text, text);
+
+        let street = find_component(block, AddressComponentType::Street);
+        assert_eq!(street.text, "42 rue de la Paix");
+        assert_eq!(
+            street.start,
+            text.find("42 rue de la Paix").expect("street start")
+        );
+        assert_eq!(street.end, street.start + street.text.len());
+
+        let cp = find_component(block, AddressComponentType::PostalCode);
+        assert_eq!(cp.text, "75002");
+        assert_eq!(cp.start, text.find("75002").expect("cp start"));
+        assert_eq!(cp.end, cp.start + cp.text.len());
+
+        let city = find_component(block, AddressComponentType::City);
+        assert_eq!(city.text, "Paris");
+        assert_eq!(city.start, text.find("Paris").expect("city start"));
+        assert_eq!(city.end, city.start + city.text.len());
+
+        let country = find_component(block, AddressComponentType::Country);
+        assert_eq!(country.text, "France");
+        assert_eq!(country.start, text.find("France").expect("country start"));
+        assert_eq!(country.end, country.start + country.text.len());
+    }
+
+    #[test]
+    fn test_french_street_not_at_line_start() {
+        let detector = AddressDetector::new(AddressFormat::Fr);
+        let text = "Header\r\nAddr: 42 rue de la Paix\r\n75002 Paris";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(
+            block.start,
+            text.find("42 rue de la Paix").expect("street match")
+        );
+        assert_eq!(block.full_text, "42 rue de la Paix\r\n75002 Paris");
+
+        let street = find_component(block, AddressComponentType::Street);
+        assert_eq!(street.text, "42 rue de la Paix");
+        assert_eq!(street.start, block.start);
+        assert_eq!(street.end, street.start + street.text.len());
+    }
+
+    #[test]
+    fn test_french_cp_city_line_with_prefix_offsets() {
+        let detector = AddressDetector::new(AddressFormat::Fr);
+        let text = "42 rue de la Paix\nCP: 75002 Paris";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+
+        let cp = find_component(block, AddressComponentType::PostalCode);
+        assert_eq!(cp.text, "75002");
+        assert_eq!(cp.start, text.find("75002").expect("cp start"));
+        assert_eq!(cp.end, cp.start + cp.text.len());
+
+        let city = find_component(block, AddressComponentType::City);
+        assert_eq!(city.text, "Paris");
+        assert_eq!(city.start, text.find("Paris").expect("city start"));
+        assert_eq!(city.end, city.start + city.text.len());
+    }
+
+    #[test]
+    fn test_french_single_line_street_and_cp_city() {
+        let detector = AddressDetector::new(AddressFormat::Fr);
+        let text = "42 rue de la Paix 75002 Paris";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(block.full_text, text);
+
+        let cp = find_component(block, AddressComponentType::PostalCode);
+        assert_eq!(cp.text, "75002");
+        assert_eq!(cp.start, text.find("75002").expect("cp start"));
+        assert_eq!(cp.end, cp.start + cp.text.len());
+
+        let city = find_component(block, AddressComponentType::City);
+        assert_eq!(city.text, "Paris");
+        assert_eq!(city.start, text.find("Paris").expect("city start"));
+        assert_eq!(city.end, city.start + city.text.len());
+    }
+
+    #[test]
+    fn test_french_street_on_last_line_is_safe() {
+        let detector = AddressDetector::new(AddressFormat::Fr);
+        let text = "Hello\r\n42 rue de la Paix";
+        let blocks = detector.detect(text);
+
+        assert!(blocks.is_empty());
+    }
+
+    #[test]
+    fn test_french_address_without_country_street_second_last_is_safe() {
+        let detector = AddressDetector::new(AddressFormat::Fr);
+        let text = "Header\n42 rue de la Paix\n75002 Paris";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(
+            block.start,
+            text.find("42 rue de la Paix").expect("street match")
+        );
+        assert_eq!(block.full_text, "42 rue de la Paix\n75002 Paris");
+    }
+
+    #[test]
+    fn test_french_cp_city_on_same_line_with_following_line() {
+        let detector = AddressDetector::new(AddressFormat::Fr);
+        let text = "42 rue de la Paix 75002 Paris\r\nIgnore this line";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        assert_eq!(block.full_text, "42 rue de la Paix 75002 Paris");
+
+        let cp = find_component(block, AddressComponentType::PostalCode);
+        assert_eq!(cp.text, "75002");
+        assert_eq!(cp.start, text.find("75002").expect("cp start"));
+        assert_eq!(cp.end, cp.start + cp.text.len());
+
+        let city = find_component(block, AddressComponentType::City);
+        assert_eq!(city.text, "Paris");
+        assert_eq!(city.start, text.find("Paris").expect("city start"));
+        assert_eq!(city.end, city.start + city.text.len());
+    }
+
+    #[test]
+    fn test_french_country_line_prefix_offsets() {
+        let detector = AddressDetector::new(AddressFormat::Fr);
+        let text = "42 rue de la Paix\r\n75002 Paris\r\nCountry: France";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 1);
+        let block = &blocks[0];
+        let country = find_component(block, AddressComponentType::Country);
+        assert_eq!(country.text, "France");
+        assert_eq!(country.start, text.find("France").expect("country start"));
+        assert_eq!(country.end, country.start + country.text.len());
+    }
+
+    #[test]
+    fn test_french_single_line_cp_city_not_suppressed_by_later_block() {
+        let detector = AddressDetector::new(AddressFormat::Fr);
+        let text = "Header: 75002 Paris\n42 rue de la Paix\n75002 Paris";
+        let blocks = detector.detect(text);
+
+        assert_eq!(blocks.len(), 2);
+
+        let header_match_start = text.find("75002 Paris").expect("header match");
+        let street_match_start = text.find("42 rue de la Paix").expect("street match");
+
+        assert!(blocks.iter().any(|b| b.start == header_match_start));
+        assert!(blocks.iter().any(|b| b.start == street_match_start));
     }
 
     #[test]
