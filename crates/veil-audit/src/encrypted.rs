@@ -122,6 +122,7 @@ impl EncryptedAuditLogger {
             options.mode(0o600);
         }
         let mut file = options.open(&log_file)?;
+        crate::fs_security::harden_audit_log_file(&log_file);
 
         writeln!(file, "{}", encrypted)?;
 
@@ -298,6 +299,7 @@ mod tests {
     use super::*;
     use crate::entry::{AuditOutcome, AuditParameters};
     use crate::operation::AuditOperation;
+    use chrono::TimeZone;
     use tempfile::TempDir;
 
     fn test_key() -> Vec<u8> {
@@ -306,6 +308,12 @@ mod tests {
 
     fn test_config() -> EncryptionConfig {
         EncryptionConfig::new(test_key()).unwrap()
+    }
+
+    fn entry_at(timestamp: chrono::DateTime<chrono::Utc>, operation: AuditOperation) -> AuditEntry {
+        let mut entry = AuditEntry::new(operation, Default::default(), Default::default());
+        entry.timestamp = timestamp;
+        entry
     }
 
     #[test]
@@ -461,6 +469,72 @@ mod tests {
         };
         let entries = logger.query(&filter).unwrap();
         assert_eq!(entries.len(), 2);
+    }
+
+    #[test]
+    fn test_encrypted_query_filter_from_to_inclusive() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut logger = EncryptedAuditLogger::new(temp_dir.path(), test_config()).unwrap();
+
+        let t1 = chrono::Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+        let t2 = chrono::Utc.with_ymd_and_hms(2025, 1, 2, 0, 0, 0).unwrap();
+        let t3 = chrono::Utc.with_ymd_and_hms(2025, 1, 3, 0, 0, 0).unwrap();
+
+        logger.log(entry_at(t1, AuditOperation::Scan)).unwrap();
+        logger.log(entry_at(t2, AuditOperation::Scan)).unwrap();
+        logger.log(entry_at(t3, AuditOperation::Scan)).unwrap();
+
+        let filter = AuditFilter {
+            from: Some(t2),
+            ..Default::default()
+        };
+        let entries = logger.query(&filter).unwrap();
+        let timestamps: Vec<_> = entries.iter().map(|e| e.timestamp).collect();
+        assert_eq!(timestamps, vec![t2, t3]);
+
+        let filter = AuditFilter {
+            to: Some(t2),
+            ..Default::default()
+        };
+        let entries = logger.query(&filter).unwrap();
+        let timestamps: Vec<_> = entries.iter().map(|e| e.timestamp).collect();
+        assert_eq!(timestamps, vec![t1, t2]);
+    }
+
+    #[test]
+    fn test_encrypted_load_last_checksum_on_reopen() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = test_config();
+
+        let t1 = chrono::Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+        let t2 = chrono::Utc.with_ymd_and_hms(2025, 1, 2, 0, 0, 0).unwrap();
+
+        {
+            let mut logger = EncryptedAuditLogger::new(temp_dir.path(), config.clone()).unwrap();
+            logger.log(entry_at(t1, AuditOperation::Scan)).unwrap();
+        }
+
+        {
+            let mut logger = EncryptedAuditLogger::new(temp_dir.path(), config.clone()).unwrap();
+            logger.log(entry_at(t2, AuditOperation::Protect)).unwrap();
+        }
+
+        let logger = EncryptedAuditLogger::new(temp_dir.path(), config).unwrap();
+        let entries = logger.query(&AuditFilter::default()).unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(
+            entries[1].previous_checksum,
+            Some(entries[0].checksum.clone())
+        );
+    }
+
+    #[test]
+    fn test_encryption_config_debug_redacts_key() {
+        let key = vec![1u8; 32];
+        let config = EncryptionConfig::new(key).unwrap();
+        let debug = format!("{:?}", config);
+        assert!(debug.contains("EncryptionConfig"));
+        assert!(debug.contains("[REDACTED]"));
     }
 }
 

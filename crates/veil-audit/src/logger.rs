@@ -2,7 +2,7 @@
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, NaiveDate, Utc};
 use zeroize::Zeroizing;
@@ -91,6 +91,7 @@ impl AuditLogger {
             options.mode(0o600);
         }
         let mut file = options.open(&log_file)?;
+        crate::fs_security::harden_audit_log_file(&log_file);
 
         let json = serde_json::to_string(&entry)?;
         writeln!(file, "{}", json)?;
@@ -139,6 +140,18 @@ impl AuditLogger {
                     }
                 }
 
+                if let Some(ref paths) = filter.paths {
+                    let matches_input = entry.parameters.input.iter().any(|p| paths.contains(p));
+                    let matches_output = entry
+                        .parameters
+                        .output
+                        .as_ref()
+                        .is_some_and(|p| paths.contains(p));
+                    if !matches_input && !matches_output {
+                        continue;
+                    }
+                }
+
                 entries.push(entry);
             }
         }
@@ -151,19 +164,41 @@ impl AuditLogger {
         self.log_dir.join(format!("audit-{}.jsonl", date))
     }
 
+    fn parse_log_file_date(path: &Path) -> Option<NaiveDate> {
+        let file_name = path.file_name()?.to_str()?;
+        if !(file_name.starts_with("audit-") && file_name.ends_with(".jsonl")) {
+            return None;
+        }
+
+        let date_str = file_name
+            .trim_start_matches("audit-")
+            .trim_end_matches(".jsonl");
+        NaiveDate::parse_from_str(date_str, "%Y-%m-%d").ok()
+    }
+
     /// Get log files in date range.
     fn get_log_files_in_range(
         &self,
-        _from: Option<DateTime<Utc>>,
-        _to: Option<DateTime<Utc>>,
+        from: Option<DateTime<Utc>>,
+        to: Option<DateTime<Utc>>,
     ) -> Result<Vec<PathBuf>, AuditError> {
         let mut files = Vec::new();
+        let from_date = from.map(|t| t.date_naive());
+        let to_date = to.map(|t| t.date_naive());
 
         if self.log_dir.exists() {
             for entry in fs::read_dir(&self.log_dir)? {
                 let entry = entry?;
                 let path = entry.path();
                 if path.extension().is_some_and(|e| e == "jsonl") {
+                    if let Some(date) = Self::parse_log_file_date(&path) {
+                        if from_date.is_some_and(|from| date < from) {
+                            continue;
+                        }
+                        if to_date.is_some_and(|to| date > to) {
+                            continue;
+                        }
+                    }
                     files.push(path);
                 }
             }
@@ -207,10 +242,17 @@ impl AuditLogger {
 mod tests {
     use super::*;
     use crate::entry::{AuditOutcome, AuditParameters};
+    use chrono::TimeZone;
     use tempfile::TempDir;
 
     fn test_key() -> Vec<u8> {
         vec![0u8; 32]
+    }
+
+    fn entry_at(timestamp: DateTime<Utc>, operation: AuditOperation) -> AuditEntry {
+        let mut entry = AuditEntry::new(operation, Default::default(), Default::default());
+        entry.timestamp = timestamp;
+        entry
     }
 
     #[test]
@@ -324,6 +366,49 @@ mod tests {
     }
 
     #[test]
+    fn test_query_filter_by_paths_matches_input_and_output() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
+
+        let mut params1 = AuditParameters::default();
+        params1.input.push(PathBuf::from("input-a.txt"));
+        logger
+            .log(AuditEntry::new(
+                AuditOperation::Scan,
+                params1,
+                AuditOutcome::success(),
+            ))
+            .unwrap();
+
+        let mut params2 = AuditParameters::default();
+        params2.input.push(PathBuf::from("input-b.txt"));
+        params2.output = Some(PathBuf::from("output-b.txt"));
+        logger
+            .log(AuditEntry::new(
+                AuditOperation::Protect,
+                params2,
+                AuditOutcome::success(),
+            ))
+            .unwrap();
+
+        let filter = AuditFilter {
+            paths: Some(vec![PathBuf::from("input-a.txt")]),
+            ..Default::default()
+        };
+        let entries = logger.query(&filter).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].operation, AuditOperation::Scan);
+
+        let filter = AuditFilter {
+            paths: Some(vec![PathBuf::from("output-b.txt")]),
+            ..Default::default()
+        };
+        let entries = logger.query(&filter).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].operation, AuditOperation::Protect);
+    }
+
+    #[test]
     fn test_query_empty_log() {
         let temp_dir = TempDir::new().unwrap();
         let logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
@@ -381,5 +466,77 @@ mod tests {
         assert_eq!(entries[0].parameters.policy, Some("strict".to_string()));
         assert!(!entries[0].outcome.success);
         assert_eq!(entries[0].outcome.error, Some("test error".to_string()));
+    }
+
+    #[test]
+    fn test_query_filter_from_inclusive() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
+
+        let t1 = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+        let t2 = Utc.with_ymd_and_hms(2025, 1, 2, 0, 0, 0).unwrap();
+        let t3 = Utc.with_ymd_and_hms(2025, 1, 3, 0, 0, 0).unwrap();
+
+        logger.log(entry_at(t1, AuditOperation::Scan)).unwrap();
+        logger.log(entry_at(t2, AuditOperation::Scan)).unwrap();
+        logger.log(entry_at(t3, AuditOperation::Scan)).unwrap();
+
+        let filter = AuditFilter {
+            from: Some(t2),
+            ..Default::default()
+        };
+        let entries = logger.query(&filter).unwrap();
+
+        let timestamps: Vec<_> = entries.iter().map(|e| e.timestamp).collect();
+        assert_eq!(timestamps, vec![t2, t3]);
+    }
+
+    #[test]
+    fn test_query_filter_to_inclusive() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
+
+        let t1 = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+        let t2 = Utc.with_ymd_and_hms(2025, 1, 2, 0, 0, 0).unwrap();
+        let t3 = Utc.with_ymd_and_hms(2025, 1, 3, 0, 0, 0).unwrap();
+
+        logger.log(entry_at(t1, AuditOperation::Scan)).unwrap();
+        logger.log(entry_at(t2, AuditOperation::Scan)).unwrap();
+        logger.log(entry_at(t3, AuditOperation::Scan)).unwrap();
+
+        let filter = AuditFilter {
+            to: Some(t2),
+            ..Default::default()
+        };
+        let entries = logger.query(&filter).unwrap();
+
+        let timestamps: Vec<_> = entries.iter().map(|e| e.timestamp).collect();
+        assert_eq!(timestamps, vec![t1, t2]);
+    }
+
+    #[test]
+    fn test_load_last_checksum_on_reopen() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let t1 = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+        let t2 = Utc.with_ymd_and_hms(2025, 1, 2, 0, 0, 0).unwrap();
+
+        {
+            let mut logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
+            logger.log(entry_at(t1, AuditOperation::Scan)).unwrap();
+        }
+
+        {
+            let mut logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
+            logger.log(entry_at(t2, AuditOperation::Protect)).unwrap();
+        }
+
+        let logger = AuditLogger::new_with_key(temp_dir.path(), test_key()).unwrap();
+        let entries = logger.query(&AuditFilter::default()).unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(
+            entries[1].previous_checksum,
+            Some(entries[0].checksum.clone())
+        );
     }
 }

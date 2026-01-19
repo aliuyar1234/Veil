@@ -22,6 +22,9 @@ hmac.workspace = true
 hex.workspace = true
 zeroize.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Memory"] }
+
 [dev-dependencies]
 pretty_assertions.workspace = true
 tempfile.workspace = true

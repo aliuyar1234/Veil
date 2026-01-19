@@ -72,3 +72,87 @@ impl RedactionsSummary {
         summary
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use veil_detect::{Finding, ValidationStatus};
+    use veil_redact::AppliedRedaction;
+
+    #[test]
+    fn test_findings_summary_add_increments_counts() {
+        let mut summary = FindingsSummary::new();
+
+        summary.add(&PiiCategory::Email);
+        summary.add(&PiiCategory::Email);
+        summary.add(&PiiCategory::Ssn);
+
+        assert_eq!(summary.total, 3);
+        assert_eq!(summary.by_category.get("email"), Some(&2));
+        assert_eq!(summary.by_category.get("ssn"), Some(&1));
+    }
+
+    #[test]
+    fn test_findings_summary_from_findings_counts_categories() {
+        let findings = vec![
+            Finding::new(
+                "alice@example.com",
+                PiiCategory::Email,
+                0,
+                17,
+                0.9,
+                ValidationStatus::Unvalidated,
+                0,
+            ),
+            Finding::new(
+                "bob@example.com",
+                PiiCategory::Email,
+                0,
+                15,
+                0.9,
+                ValidationStatus::Unvalidated,
+                0,
+            ),
+            Finding::new(
+                "123-45-6789",
+                PiiCategory::Ssn,
+                0,
+                11,
+                0.9,
+                ValidationStatus::Valid,
+                0,
+            ),
+        ];
+
+        let summary = FindingsSummary::from_findings(&findings);
+        assert_eq!(summary.total, 3);
+        assert_eq!(summary.by_category.get("email"), Some(&2));
+        assert_eq!(summary.by_category.get("ssn"), Some(&1));
+    }
+
+    #[test]
+    fn test_redactions_summary_from_redactions_counts_categories() {
+        let redactions = vec![
+            AppliedRedaction::new(
+                "alice@example.com",
+                "[EMAIL]",
+                (0, 17),
+                (0, 7),
+                PiiCategory::Email,
+            ),
+            AppliedRedaction::new(
+                "bob@example.com",
+                "[EMAIL]",
+                (0, 15),
+                (0, 7),
+                PiiCategory::Email,
+            ),
+            AppliedRedaction::new("123-45-6789", "[SSN]", (0, 11), (0, 5), PiiCategory::Ssn),
+        ];
+
+        let summary = RedactionsSummary::from_redactions(&redactions);
+        assert_eq!(summary.total, 3);
+        assert_eq!(summary.by_category.get("email"), Some(&2));
+        assert_eq!(summary.by_category.get("ssn"), Some(&1));
+    }
+}

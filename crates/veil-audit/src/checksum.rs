@@ -157,6 +157,27 @@ pub fn verify_chain_with_key(
 mod tests {
     use super::*;
     use crate::operation::AuditOperation;
+    use std::sync::{Mutex, OnceLock};
+
+    fn with_env_var<T>(name: &str, value: Option<&str>, f: impl FnOnce() -> T) -> T {
+        static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        let _guard = ENV_LOCK.get_or_init(|| Mutex::new(())).lock().unwrap();
+
+        let old = std::env::var_os(name);
+        match value {
+            Some(v) => std::env::set_var(name, v),
+            None => std::env::remove_var(name),
+        }
+
+        let result = f();
+
+        match old {
+            Some(v) => std::env::set_var(name, v),
+            None => std::env::remove_var(name),
+        }
+
+        result
+    }
 
     #[test]
     fn test_checksum_deterministic() {
@@ -308,5 +329,67 @@ mod tests {
 
         let err = verify_chain_with_key(&[entry], None).unwrap_err();
         assert!(matches!(err, AuditError::MissingIntegrityKey));
+    }
+
+    #[test]
+    fn test_hmac_key_from_env_valid() {
+        let key = [0u8; 32];
+        let hex_key = hex::encode(key);
+
+        with_env_var(AUDIT_HMAC_KEY_ENV, Some(&hex_key), || {
+            let bytes = hmac_key_from_env().unwrap();
+            assert_eq!(bytes, key);
+        });
+    }
+
+    #[test]
+    fn test_hmac_key_from_env_invalid_length() {
+        // Decodes to a single byte (0x00), but we require 32 bytes.
+        with_env_var(AUDIT_HMAC_KEY_ENV, Some("00"), || {
+            let err = hmac_key_from_env().unwrap_err();
+            assert!(matches!(
+                err,
+                AuditError::InvalidKey {
+                    expected: 32,
+                    actual: 1
+                }
+            ));
+        });
+    }
+
+    #[test]
+    fn test_hmac_key_from_env_invalid_hex() {
+        with_env_var(AUDIT_HMAC_KEY_ENV, Some("not-hex"), || {
+            let err = hmac_key_from_env().unwrap_err();
+            assert!(matches!(err, AuditError::MissingIntegrityKey));
+        });
+    }
+
+    #[test]
+    fn test_verify_chain_from_env_hmac_success() {
+        let key = [7u8; 32];
+        let hex_key = hex::encode(key);
+
+        with_env_var(AUDIT_HMAC_KEY_ENV, Some(&hex_key), || {
+            let mut entry =
+                AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default());
+            entry.checksum = calculate_checksum_hmac(&entry, &key).unwrap();
+
+            verify_chain_from_env(&[entry]).unwrap();
+        });
+    }
+
+    #[test]
+    fn test_verify_chain_from_env_hmac_missing_key_fails() {
+        let key = [7u8; 32];
+
+        with_env_var(AUDIT_HMAC_KEY_ENV, None, || {
+            let mut entry =
+                AuditEntry::new(AuditOperation::Scan, Default::default(), Default::default());
+            entry.checksum = calculate_checksum_hmac(&entry, &key).unwrap();
+
+            let err = verify_chain_from_env(&[entry]).unwrap_err();
+            assert!(matches!(err, AuditError::MissingIntegrityKey));
+        });
     }
 }

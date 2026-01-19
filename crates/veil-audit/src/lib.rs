@@ -6,6 +6,7 @@ mod checksum;
 mod encrypted;
 mod entry;
 mod error;
+mod fs_security;
 mod logger;
 mod operation;
 mod summary;
