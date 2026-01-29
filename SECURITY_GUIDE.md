@@ -35,8 +35,8 @@ Storage guidance:
 
 Rotation guidance:
 
-- Plan rotation explicitly: audit log verification requires the key that was used to compute each entry’s HMAC.
-- When rotating, prefer starting a new audit log directory (or otherwise separating “epochs”) and retaining old keys securely for verifying historical logs.
+- Plan rotation explicitly: audit log verification requires the key that was used to compute each entry's HMAC.
+- When rotating, prefer starting a new audit log directory (or otherwise separating "epochs") and retaining old keys securely for verifying historical logs.
 - Record the rotation time and which key applies to which audit log epoch in your secrets inventory.
 
 ### Redaction Verification Key (Optional)
@@ -60,7 +60,7 @@ If you enable the `veil-audit/encryption` feature and use `EncryptedAuditLogger`
 
 ## Threat Model
 
-See `THREAT_MODEL.md` for the project’s short threat model and explicitly out-of-scope scenarios.
+See `THREAT_MODEL.md` for the project's short threat model and explicitly out-of-scope scenarios.
 
 ## CI / Supply Chain Controls
 
@@ -68,3 +68,17 @@ See `THREAT_MODEL.md` for the project’s short threat model and explicitly out-
 - Dependency scanning: `cargo audit` + `cargo deny check` + `cargo vet check`.
 - Secret scanning: `detect-secrets` baseline (`.secrets.baseline`).
 
+## High-Risk Dependencies (Parsers)
+
+Veil parses attacker-controlled inputs (PDF/Office/email). These components are higher-risk than typical application dependencies and should be updated intentionally.
+
+Current parser dependencies to monitor closely:
+
+- PDF: `pdf-extract` (optional feature in `veil-parsers`)
+- Office: `calamine`, `zip`, `quick-xml` (in `veil-office`)
+- Email: `mailparse`, `msg_parser` (in `veil-email`)
+
+Recommended update cadence:
+
+- Review and apply parser/security updates on a fixed cadence (for example monthly) and immediately for relevant advisories/CVEs.
+- Prefer small updates and review changelogs for parser crates; avoid large "bundle" upgrades without a test run against representative fixtures.

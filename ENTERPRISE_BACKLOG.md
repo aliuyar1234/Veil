@@ -23,7 +23,7 @@ Items here are intentionally operational/governance-heavy (things that don't nat
   - Note: current bootstrap uses `supply-chain/config.toml` exemptions; convert exemptions to real audits over time.
 - [x] Reduce `cargo deny` duplicate-dependency warnings if feasible:
   - `html5ever` / `markup5ever` / `tendril` duplicates are currently pulled by different upstream crates (non-blocking)
-- [ ] Consider pinning/monitoring high-risk parser dependencies (PDF/Office/email), and document update cadence
+- [x] Consider pinning/monitoring high-risk parser dependencies (PDF/Office/email), and document update cadence (`SECURITY_GUIDE.md`)
 
 ## Security Hardening
 
@@ -42,8 +42,8 @@ Items here are intentionally operational/governance-heavy (things that don't nat
 
 ## Performance & Scalability
 
-- [ ] Add criterion benchmarks for:
-  - [ ] scan throughput (large text, large PDFs, many small files)
+- [x] Add criterion benchmarks for:
+  - [x] scan throughput (large text, large PDFs, many small files)
   - [x] detector hot paths (dictionary + regex detectors) (existing `veil-detect` benches)
   - [x] PDF parsing microbench (existing `veil-parsers` benches)
 - [ ] Add perf regression monitoring strategy (periodic benchmark runs, stored baselines, or manual process)
