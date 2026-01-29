@@ -58,6 +58,14 @@ mutants-crate crate:
 audit:
     cargo audit
 
+# Run cargo-deny checks
+deny:
+    cargo deny check
+
+# Run cargo-vet checks
+vet:
+    cargo vet check
+
 # Build documentation
 docs:
     cargo doc --workspace --no-deps --all-features
@@ -77,7 +85,7 @@ bench-crate crate:
 
 # Run fuzzing (requires nightly)
 fuzz target:
-    cd fuzz && cargo +nightly fuzz run {{target}} -- -max_total_time=60
+    cd fuzz && cargo +nightly fuzz run {{target}} -- -max_total_time=300
 
 # List fuzz targets
 fuzz-list:
@@ -109,7 +117,7 @@ cli *args:
 
 # Install development tools
 setup:
-    cargo install cargo-watch cargo-audit cargo-llvm-cov cargo-mutants cargo-outdated
+    cargo install cargo-watch cargo-audit cargo-deny cargo-llvm-cov cargo-mutants cargo-outdated cargo-vet
     cargo install wasm-pack
     pip install pre-commit
     pre-commit install

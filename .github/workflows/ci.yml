@@ -22,15 +22,15 @@ jobs:
       matrix:
         os: [ubuntu-24.04, macos-14, windows-2022]
     steps:
-      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
         with:
           components: clippy, rustfmt
 
       - name: Cache cargo registry
-        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -50,15 +50,15 @@ jobs:
     name: Lint
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
         with:
           components: clippy, rustfmt
 
       - name: Cache cargo registry
-        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -78,15 +78,15 @@ jobs:
     name: MSRV (Rust 1.85)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust (MSRV)
-        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
         with:
           toolchain: 1.85.0
 
       - name: Cache cargo registry
-        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -103,10 +103,10 @@ jobs:
     name: WASM Build
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
         with:
           targets: wasm32-unknown-unknown
 
@@ -114,7 +114,7 @@ jobs:
         run: cargo install wasm-pack --version 0.13.1 --locked
 
       - name: Cache cargo registry
-        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -131,13 +131,13 @@ jobs:
     name: Documentation
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
 
       - name: Cache cargo registry
-        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -156,7 +156,7 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install cargo-audit
         run: cargo install cargo-audit --version 0.22.0 --locked
@@ -170,6 +170,12 @@ jobs:
       - name: Run cargo-deny
         run: cargo deny check
 
+      - name: Install cargo-vet
+        run: cargo install cargo-vet --version 0.10.2 --locked
+
+      - name: Run cargo-vet
+        run: cargo vet check
+
       - name: Install detect-secrets
         run: python -m pip install detect-secrets==1.4.0
 
@@ -180,18 +186,18 @@ jobs:
     name: Code Coverage
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
         with:
           components: llvm-tools-preview
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@9fef977cc78d9c6fecc249b5ee8f282a3a603584
+        uses: taiki-e/install-action@7e574ed8bb89811282a11aecb3fe1d043bf5bf0e
 
       - name: Cache cargo registry
-        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -224,7 +230,7 @@ jobs:
           PY
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@9fd7d16f6d7d1b5d2bec1a2887e65ceed900238
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238
         with:
           files: lcov.info
           fail_ci_if_error: false
@@ -235,16 +241,16 @@ jobs:
     # Only run on main branch to save CI time
     if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@4e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@be9e76fd7c4901c61fb841f559994984270fce7
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
 
       - name: Install cargo-mutants
         run: cargo install cargo-mutants --version 26.0.0 --locked
 
       - name: Cache cargo registry
-        uses: actions/cache@057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry

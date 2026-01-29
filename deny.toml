@@ -32,6 +32,9 @@ skip = [
   { crate = "thiserror", reason = "Dependency split: msg_parser uses thiserror 1.x while most of the ecosystem has moved to thiserror 2.x" },
   { crate = "thiserror-impl", reason = "Dependency split: msg_parser uses thiserror 1.x while most of the ecosystem has moved to thiserror 2.x" },
   { crate = "unicode-width", reason = "Dependency split: miette/textwrap requires unicode-width 0.1 while scraper/getopts pulls unicode-width 0.2" },
+  { crate = "html5ever", reason = "Unavoidable split: scraper depends on html5ever 0.36.x while html2text depends on html5ever 0.37.x" },
+  { crate = "markup5ever", reason = "Unavoidable split: scraper depends on markup5ever 0.36.x while html2text depends on markup5ever 0.37.x" },
+  { crate = "tendril", reason = "Unavoidable split: scraper depends on tendril 0.4.x while html2text depends on tendril 0.5.x" },
 ]
 
 [sources]
