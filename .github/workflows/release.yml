@@ -21,6 +21,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
         with:
+          toolchain: 1.91.1
           components: clippy
 
       - name: Run tests
@@ -40,6 +41,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
+        with:
+          toolchain: 1.91.1
 
       - name: Publish crates (dependency order)
         shell: bash
@@ -104,6 +107,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
+        with:
+          toolchain: 1.91.1
 
       - name: Install cargo-sbom
         run: cargo install cargo-sbom --version 0.10.0 --locked
