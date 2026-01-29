@@ -150,7 +150,7 @@ This document breaks down the implementation of the batch processing feature int
 2. Create `tests/fixtures/archives/` with ZIP files:
    - `simple.zip` - Archive of simple directory
    - `nested.zip` - Archive containing another ZIP
-   - `encrypted.zip` - Password-protected archive (password: "test")
+   - `encrypted.zip` - Password-protected archive (password: "test") <!-- pragma: allowlist secret -->
    - `corrupted.zip` - Intentionally broken ZIP
 3. Add `.gitkeep` files to preserve directory structure
 4. Document fixtures in `tests/fixtures/README.md`
