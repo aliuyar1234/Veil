@@ -201,6 +201,8 @@ jobs:
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@7e574ed8bb89811282a11aecb3fe1d043bf5bf0e
+        with:
+          tool: cargo-llvm-cov
 
       - name: Cache cargo registry
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
