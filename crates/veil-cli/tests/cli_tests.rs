@@ -7,6 +7,10 @@ use serde_json::Value;
 use std::fs;
 use tempfile::TempDir;
 
+const PDF_WITH_PII: &[u8] = include_bytes!("../../veil-parsers/tests/fixtures/pdf/with_pii.pdf");
+const XLSX_WITH_PII: &[u8] = include_bytes!("../../veil-office/tests/fixtures/xlsx/pii_data.xlsx");
+const EML_SIMPLE_WITH_PII: &[u8] = include_bytes!("../../veil-email/tests/fixtures/eml/simple.eml");
+
 /// Get the CLI binary.
 fn veil_cmd() -> Command {
     cargo_bin_cmd!("veil")
@@ -307,6 +311,90 @@ fn test_scan_recursive_directory_scans_supported_files_only() {
     assert!(!results.iter().any(|r| r["file"]
         .as_str()
         .is_some_and(|f| f.ends_with("unsupported.bin"))));
+}
+
+#[test]
+fn test_scan_pdf_fixture_json_is_stable_shape_and_no_values_by_default() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("with_pii.pdf");
+    fs::write(&file_path, PDF_WITH_PII).unwrap();
+
+    let assert = veil_cmd()
+        .args(["--quiet", "--json", "scan", file_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let json: Value = serde_json::from_str(&stdout).unwrap();
+    let results = json.as_array().expect("expected JSON array");
+    assert_eq!(results.len(), 1);
+
+    assert_eq!(results[0]["format"].as_str(), Some("pdf"));
+    assert!(results[0]["findings_count"].as_u64().unwrap_or(0) > 0);
+
+    let findings = results[0]["findings"].as_array().expect("findings array");
+    assert_eq!(
+        results[0]["findings_count"].as_u64().unwrap_or(0) as usize,
+        findings.len()
+    );
+    assert!(findings.iter().all(|f| f.get("text").is_none()));
+}
+
+#[test]
+fn test_scan_xlsx_fixture_json_is_stable_shape_and_no_values_by_default() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("pii_data.xlsx");
+    fs::write(&file_path, XLSX_WITH_PII).unwrap();
+
+    let assert = veil_cmd()
+        .args(["--quiet", "--json", "scan", file_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let json: Value = serde_json::from_str(&stdout).unwrap();
+    let results = json.as_array().expect("expected JSON array");
+    assert_eq!(results.len(), 1);
+
+    assert_eq!(results[0]["format"].as_str(), Some("xlsx"));
+    assert!(results[0]["findings_count"].as_u64().unwrap_or(0) > 0);
+
+    let findings = results[0]["findings"].as_array().expect("findings array");
+    assert_eq!(
+        results[0]["findings_count"].as_u64().unwrap_or(0) as usize,
+        findings.len()
+    );
+    assert!(findings.iter().all(|f| f.get("text").is_none()));
+}
+
+#[test]
+fn test_scan_eml_fixture_json_is_stable_shape_and_no_values_by_default() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("simple.eml");
+    fs::write(&file_path, EML_SIMPLE_WITH_PII).unwrap();
+
+    let assert = veil_cmd()
+        .args(["--quiet", "--json", "scan", file_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let json: Value = serde_json::from_str(&stdout).unwrap();
+    let results = json.as_array().expect("expected JSON array");
+    assert_eq!(results.len(), 1);
+
+    assert_eq!(results[0]["format"].as_str(), Some("eml"));
+    assert!(results[0]["findings_count"].as_u64().unwrap_or(0) > 0);
+
+    let findings = results[0]["findings"].as_array().expect("findings array");
+    assert_eq!(
+        results[0]["findings_count"].as_u64().unwrap_or(0) as usize,
+        findings.len()
+    );
+    assert!(findings.iter().all(|f| f.get("text").is_none()));
 }
 
 #[test]

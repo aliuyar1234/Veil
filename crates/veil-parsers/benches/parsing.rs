@@ -112,6 +112,26 @@ fn bench_json_parsing(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_pdf_parsing(c: &mut Criterion) {
+    let mut group = c.benchmark_group("parse_pdf");
+    let options = ParseOptions {
+        format: Some(FileFormat::Pdf),
+        ..Default::default()
+    };
+
+    for fixture in ["simple.pdf", "multipage.pdf", "with_pii.pdf"].iter() {
+        let path = format!("tests/fixtures/pdf/{}", fixture);
+        let content = std::fs::read(&path).expect("failed to read PDF fixture");
+
+        group.throughput(Throughput::Bytes(content.len() as u64));
+        group.bench_with_input(BenchmarkId::new("fixture", fixture), &content, |b, data| {
+            b.iter(|| parse_bytes(black_box(data), black_box(&options)))
+        });
+    }
+
+    group.finish();
+}
+
 fn bench_format_detection(c: &mut Criterion) {
     let text = generate_text_content(100);
     let csv = generate_csv_content(100);
@@ -135,6 +155,7 @@ criterion_group!(
     bench_text_parsing,
     bench_csv_parsing,
     bench_json_parsing,
+    bench_pdf_parsing,
     bench_format_detection
 );
 

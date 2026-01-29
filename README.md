@@ -1,44 +1,46 @@
-﻿# Veil
+# Veil
 
+[![CI](https://github.com/aliuyar1234/Veil/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/aliuyar1234/Veil/actions/workflows/ci.yml)
+[![Code Coverage](https://codecov.io/gh/aliuyar1234/Veil/branch/main/graph/badge.svg)](https://codecov.io/gh/aliuyar1234/Veil)
+[![CodeQL](https://github.com/aliuyar1234/Veil/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/aliuyar1234/Veil/actions/workflows/codeql.yml)
+[![MSRV](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 
-Local-first PII detection and redaction toolkit. Runs offline by default and keeps data on your machine.
+Local-first PII detection and redaction toolkit for text, PDFs, Office documents, and emails. Runs offline by default and keeps data on your machine.
 
-## At a glance
+## Highlights
 
-- Detects and protects PII in text, PDFs, Office docs, and emails.
-- Local processing only; no telemetry or runtime network calls.
-- Outputs hide raw values by default; explicit opt-in for value exposure.
-- Audit logging with integrity checks; optional encryption.
-- Batch and streaming modes for large datasets.
+- **Offline by default**: no telemetry and no runtime network calls.
+- **Safe output defaults**: matched values are hidden unless explicitly requested.
+- **Policy-driven protection**: redact/mask/label with configurable rules.
+- **Audit logging**: tamper-evident hash chain; optional at-rest encryption.
+- **Built for scale**: batch + streaming workflows for large datasets.
 
-## Security and data handling
+## Install
 
-- Data stays on the host; Veil does not initiate network connections at runtime.
-- Output and logs redact PII by default; `scan --include-values` requires confirmation. 
-- Sensitive strings are zeroized on drop and redacted in Debug, Display, and Serialize. 
-- Audit logs are chained for tamper detection; on Unix they are created with 0600 perms and on Windows the logger applies a restrictive DACL (best-effort). 
-- Plaintext key and token storage is disabled by default. Set `VEIL_ALLOW_PLAINTEXT_STORAGE=1` 
-  to use `LocalKeyProvider` or `FileVault` for development. 
-- Encrypted audit logs require the `encryption` feature. 
+From source:
+
+```bash
+git clone https://github.com/aliuyar1234/Veil.git
+cd Veil
+cargo install --path crates/veil-cli --locked
+veil --help
+```
 
 ## Quick start (CLI)
 
 ```bash
-# Install Veil
-git clone https://github.com/aliuyar1234/Veil.git
-cd Veil
-cargo build --release -p veil-cli
+# Scan a document for sensitive data (values are hidden by default)
+veil scan document.txt
 
-# Scan a document for sensitive data
-./target/release/veil scan document.txt
-
-# Protect a document (redact sensitive data)
-./target/release/veil protect document.txt -o safe_document.txt
+# Redact sensitive data
+veil protect document.txt -o safe_document.txt
 
 # Scan an entire folder
-./target/release/veil scan ./documents --recursive
+veil scan ./documents --recursive
+
+# CI-friendly: fail if any findings are detected
+veil scan ./documents --recursive --fail-on-findings
 ```
 
 ## Use in your code
@@ -47,69 +49,34 @@ cargo build --release -p veil-cli
 use veil_detect::DetectorRegistry;
 use veil_parsers::{parse_str, ParseOptions};
 
-// Parse your document
-let result = parse_str("Contact: john@example.com, SSN: 123-45-6789", &ParseOptions::default())?;
+let result = parse_str(
+    "Contact: john@example.com, SSN: 123-45-6789",
+    &ParseOptions::default(),
+)?;
 
-// Find all sensitive data
 let registry = DetectorRegistry::default();
 let findings = registry.detect_all(&result.segments);
 
-// Each finding tells you what was found and where
 for finding in findings {
     println!("Found {} at position {}-{}", finding.category, finding.start, finding.end);
 }
 ```
 
-## Supported data and formats
+## Security
 
-### PII categories
+- Data stays on the host; Veil does not initiate network connections at runtime.
+- `scan --include-values` is an explicit opt-in and is designed to be hard to use accidentally in automation.
+- Audit logs are chained for tamper detection; on Unix they are created with `0600` perms and on Windows the logger applies a restrictive DACL (best-effort).
+- Supply-chain checks in CI: `cargo audit`, `cargo deny`, `cargo vet`, and secret scanning (`detect-secrets`).
 
-| Category | What It Finds |
-|----------|---------------|
-| **Personal Identity** | Names, Social Security Numbers, Passport Numbers, Driver's License Numbers |
-| **Contact Information** | Email addresses, Phone numbers (US, UK, EU, international), Physical addresses |
-| **Financial Data** | Credit card numbers, Bank accounts, IBANs, EU VAT Numbers |
-| **Health Information** | Medical record numbers (HIPAA compliance) |
-| **Technical Data** | IP addresses, MAC addresses |
-| **EU/DACH Region** | German Tax ID (Steuer-ID), Swiss AHV Number, German National ID (Personalausweis), VAT Numbers (DE, AT, CH, FR, IT, ES, NL, BE, PL, UK, and more) |
+Further docs:
 
-### Formats
+- `SECURITY_GUIDE.md`
+- `THREAT_MODEL.md`
+- `OPERATIONS.md`
+- `ENTERPRISE_BACKLOG.md`
 
-- Text files (TXT, CSV, JSON, HTML)
-- Office documents (DOCX, XLSX, PPTX)
-- PDFs
-- Emails (EML, MSG)
-
-## How it works
-
-```
-Document -> Parse -> Detect -> Protect -> Output
-```
-
-1. Parse: extract text and structure from input.
-2. Detect: match patterns and validators against extracted segments.
-3. Protect: mask, label, replace, tokenize, or encrypt based on policy.
-4. Output: return a safe document and optional audit log.
-
-## Configuration and safety switches 
- 
-- `scan --include-values` exposes matched values and prompts for confirmation; add `-y` to skip the prompt. 
-- `scan --detect email,phone` limits detection to the specified detector(s); unknown detector names are rejected. 
-- `scan --fail-on-findings` exits with code 2 if any findings are detected (useful for CI pipelines). 
-- `--policy` selects a policy file; `policy init` generates a starter policy. 
-- `batch --max-size` caps file size (MB); `--jobs` controls parallelism. 
-- `batch --zip` and `--zip-password` enable archive processing. 
-- Plaintext key and token storage is disabled by default; set `VEIL_ALLOW_PLAINTEXT_STORAGE=1` for dev. 
-
-## Performance and limits
-
-- Streaming and batch modes avoid loading large files into memory.
-- Large PDF and Office parses dominate runtime; use batching and size caps when needed.
-- Benchmarks are for comparison, not absolute guarantees. Run on your target hardware:
-  - `cargo bench -p veil-crypto`
-  - `cargo bench -p veil-parsers`
-
-## Project structure
+## Repository layout
 
 ```
 Veil/
@@ -119,55 +86,35 @@ Veil/
     veil-detect      # PII detection engine (patterns, validators)
     veil-redact      # Masking and replacement
     veil-crypto      # Encryption, hashing, tokenization
-    veil-policy      # Policy engine (GDPR, HIPAA, PCI-DSS)
-    veil-audit       # Tamper-evident logging
-    veil-batch       # Parallel file processing
-    veil-stream      # Streaming detection
+    veil-policy      # Policy engine (GDPR/HIPAA/PCI-ish)
+    veil-audit       # Tamper-evident audit logging
     veil-discovery   # File discovery and scanning
-    veil-office      # Office documents (DOCX, XLSX, PPTX)
-    veil-email       # Email parsing (EML, MSG)
+    veil-office      # Office documents (DOCX/XLSX/PPTX)
+    veil-email       # Email parsing (EML/MSG)
+    veil-stream      # Streaming detection
+    veil-batch       # Parallel file processing
     veil-cli         # Command line tool
-    veil-wasm        # Browser support (WebAssembly)
+    veil-wasm        # WebAssembly (browser) support
 ```
 
-## For developers
-
-### Requirements
-
-- Rust 1.85 or newer
-- Cargo (comes with Rust)
-
-### Build and test
+## Development
 
 ```bash
-# Build everything
-cargo build --workspace
+# Full local gates
+just check
+just deny
+just vet
 
-# Run tests
-cargo test --workspace
-
-# Run with all features 
-cargo test --workspace --all-features 
- 
-# Check code quality 
-cargo clippy --workspace --all-features -- -D warnings 
- 
-# Format code 
-cargo fmt --all 
-``` 
-
-### Benchmarks
-
-```bash
-cargo bench -p veil-crypto
-cargo bench -p veil-parsers
+# Other useful commands
+just fuzz email_parser
+just bench
 ```
 
 ## License
 
 MIT OR Apache-2.0
 
-## Questions
+## Support
 
-- Open an issue on GitHub: https://github.com/aliuyar1234/Veil/issues
-- Check the CHANGELOG: CHANGELOG.md
+- Issues: https://github.com/aliuyar1234/Veil/issues
+- Changelog: `CHANGELOG.md`

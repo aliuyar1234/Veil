@@ -452,7 +452,7 @@ Users must provide:
 # config/discovery.yaml
 sources:
   - type: postgres
-    connection: "postgresql://user:pass@localhost/db"
+    connection: "postgresql://user:pass@localhost/db" # pragma: allowlist secret
     sample_size: 1000
 
   - type: s3
