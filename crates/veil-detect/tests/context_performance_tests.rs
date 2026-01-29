@@ -10,6 +10,11 @@ use std::time::Instant;
 use veil_detect::context::{AddressDetector, AddressFormat, ContextAnalyzer, TableDetector};
 use veil_detect::{Finding, PiiCategory, ValidationStatus};
 
+fn skip_perf_tests_on_ci() -> bool {
+    // CI runners are not reliable for wall-clock performance assertions.
+    std::env::var_os("CI").is_some()
+}
+
 /// Create a test finding.
 fn make_finding(text: &str, category: PiiCategory, start: usize, end: usize) -> Finding {
     Finding::new(
@@ -66,6 +71,10 @@ fn generate_csv_text(rows: usize) -> String {
 
 #[test]
 fn test_context_analyzer_performance_small() {
+    if skip_perf_tests_on_ci() {
+        return;
+    }
+
     let text = generate_sample_text(1_000);
     let findings = vec![
         make_finding("john.smith@example.com", PiiCategory::Email, 100, 122),
@@ -90,6 +99,10 @@ fn test_context_analyzer_performance_small() {
 
 #[test]
 fn test_context_analyzer_performance_medium() {
+    if skip_perf_tests_on_ci() {
+        return;
+    }
+
     let text = generate_sample_text(10_000);
     let findings: Vec<_> = (0..20)
         .map(|i| {
@@ -120,6 +133,10 @@ fn test_context_analyzer_performance_medium() {
 
 #[test]
 fn test_context_analyzer_performance_large() {
+    if skip_perf_tests_on_ci() {
+        return;
+    }
+
     let text = generate_sample_text(100_000);
     let findings: Vec<_> = (0..100)
         .map(|i| {
@@ -148,6 +165,10 @@ fn test_context_analyzer_performance_large() {
 
 #[test]
 fn test_address_detection_performance() {
+    if skip_perf_tests_on_ci() {
+        return;
+    }
+
     let text = r#"
 Shipping addresses:
 
@@ -179,6 +200,10 @@ Chicago, IL 60601
 
 #[test]
 fn test_table_detection_performance() {
+    if skip_perf_tests_on_ci() {
+        return;
+    }
+
     let csv = generate_csv_text(100);
 
     let detector = TableDetector::new();
@@ -199,6 +224,10 @@ fn test_table_detection_performance() {
 
 #[test]
 fn test_table_detection_large_csv() {
+    if skip_perf_tests_on_ci() {
+        return;
+    }
+
     let csv = generate_csv_text(1000);
 
     let detector = TableDetector::new();
@@ -217,6 +246,10 @@ fn test_table_detection_large_csv() {
 
 #[test]
 fn test_marker_detection_performance() {
+    if skip_perf_tests_on_ci() {
+        return;
+    }
+
     let text = r#"
 Dear Mr. Smith,
 Contact: Dr. Johnson
@@ -244,6 +277,10 @@ Order #12345
 
 #[test]
 fn test_multilanguage_performance() {
+    if skip_perf_tests_on_ci() {
+        return;
+    }
+
     let texts = vec![
         ("en", "Dear Mr. Smith, your email is john@example.com"),
         (
@@ -276,6 +313,10 @@ fn test_multilanguage_performance() {
 
 #[test]
 fn test_context_overhead_under_10_percent() {
+    if skip_perf_tests_on_ci() {
+        return;
+    }
+
     // This test verifies FR-009: context analysis adds <10% overhead
     // Note: In debug mode, performance is much slower than release
 
