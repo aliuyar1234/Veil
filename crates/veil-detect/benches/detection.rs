@@ -18,6 +18,19 @@ fn make_segment(content: &str) -> TextSegment {
     }
 }
 
+fn make_segment_owned(content: String) -> TextSegment {
+    let byte_length = content.len();
+    TextSegment {
+        content: content.into(),
+        position: Position::Text {
+            line: 1,
+            column: 1,
+            byte_offset: 0,
+            byte_length,
+        },
+    }
+}
+
 fn generate_test_content(lines: usize) -> Vec<TextSegment> {
     let test_lines = vec![
         "Contact John at john.doe@example.com for more information.",
@@ -37,6 +50,23 @@ fn generate_test_content(lines: usize) -> Vec<TextSegment> {
         .collect()
 }
 
+fn generate_large_text(bytes: usize) -> String {
+    let clean_line = "This is a normal line of text without sensitive data.\n";
+    let pii_line = "Contact: john.doe@example.com, Phone: +1-555-123-4567\n";
+
+    let mut content = String::with_capacity(bytes + pii_line.len());
+    let mut i = 0usize;
+    while content.len() < bytes {
+        content.push_str(clean_line);
+        if i % 50 == 0 {
+            content.push_str(pii_line);
+        }
+        i += 1;
+    }
+    content.truncate(bytes);
+    content
+}
+
 fn bench_sequential_detection(c: &mut Criterion) {
     let registry = DetectorRegistry::default();
 
@@ -48,6 +78,53 @@ fn bench_sequential_detection(c: &mut Criterion) {
 
         group.throughput(Throughput::Bytes(bytes as u64));
         group.bench_with_input(BenchmarkId::new("segments", size), &segments, |b, segs| {
+            b.iter(|| registry.detect_all(black_box(segs)))
+        });
+    }
+
+    group.finish();
+}
+
+fn bench_large_text_segment(c: &mut Criterion) {
+    let registry = DetectorRegistry::default();
+
+    let mut group = c.benchmark_group("detection_large_text");
+
+    for bytes in [100_000usize, 1_000_000, 5_000_000].iter() {
+        let content = generate_large_text(*bytes);
+        let segment = make_segment_owned(content);
+        let segments = vec![segment];
+
+        group.throughput(Throughput::Bytes(*bytes as u64));
+        group.bench_with_input(BenchmarkId::new("bytes", bytes), &segments, |b, segs| {
+            b.iter(|| registry.detect_all(black_box(segs)))
+        });
+    }
+
+    group.finish();
+}
+
+fn bench_many_small_segments(c: &mut Criterion) {
+    let registry = DetectorRegistry::default();
+
+    let clean_content = "Regular text without PII.";
+    let pii_content = "Contact: john.doe@example.com";
+
+    let mut group = c.benchmark_group("detection_many_small_segments");
+
+    for count in [1_000usize, 10_000].iter() {
+        let segments: Vec<TextSegment> = (0..*count)
+            .map(|i| {
+                make_segment(if i % 50 == 0 {
+                    pii_content
+                } else {
+                    clean_content
+                })
+            })
+            .collect();
+
+        group.throughput(Throughput::Elements(*count as u64));
+        group.bench_with_input(BenchmarkId::new("segments", count), &segments, |b, segs| {
             b.iter(|| registry.detect_all(black_box(segs)))
         });
     }
@@ -109,6 +186,8 @@ fn bench_no_pii(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_sequential_detection,
+    bench_large_text_segment,
+    bench_many_small_segments,
     bench_parallel_detection,
     bench_dense_pii,
     bench_no_pii
@@ -118,6 +197,8 @@ criterion_group!(
 criterion_group!(
     benches,
     bench_sequential_detection,
+    bench_large_text_segment,
+    bench_many_small_segments,
     bench_dense_pii,
     bench_no_pii
 );
