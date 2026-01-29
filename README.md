@@ -1,7 +1,6 @@
 # Veil
 
 [![CI](https://github.com/aliuyar1234/Veil/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/aliuyar1234/Veil/actions/workflows/ci.yml)
-[![Code Coverage](https://codecov.io/gh/aliuyar1234/Veil/branch/main/graph/badge.svg)](https://codecov.io/gh/aliuyar1234/Veil)
 [![CodeQL](https://github.com/aliuyar1234/Veil/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/aliuyar1234/Veil/actions/workflows/codeql.yml)
 [![MSRV](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)

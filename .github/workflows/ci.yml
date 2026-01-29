@@ -215,9 +215,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-cov-
 
-      - name: Generate coverage report
-        run: cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
-
       - name: Check coverage threshold (80%)
         run: |
           python - <<'PY'
@@ -236,12 +233,6 @@ jobs:
               print(f"::error::Coverage is below 80% threshold: {coverage:.2f}%")
               sys.exit(1)
           PY
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238
-        with:
-          files: lcov.info
-          fail_ci_if_error: false
 
   mutation:
     name: Mutation Testing
